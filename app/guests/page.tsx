@@ -1,0 +1,2339 @@
+﻿"use client";
+
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+
+import {
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
+
+import { supabase } from "@/src/lib/supabase";
+
+// =========================================================
+// TYPES
+// =========================================================
+
+type Company = {
+  id: string;
+  name: string;
+};
+
+type Guest = {
+  id: string;
+
+  first_name: string;
+  last_name: string;
+
+  phone: string | null;
+  whatsapp_number: string | null;
+  email: string | null;
+  id_number: string | null;
+
+  company_id: string | null;
+
+  nationality: string | null;
+  address: string | null;
+  notes: string | null;
+
+  companies: {
+    name: string;
+  } | null;
+};
+
+type Reservation = {
+  id: string;
+  guest_id: string;
+  reservation_number: string;
+  status: string;
+  arrival_date: string;
+  departure_date: string;
+  total_amount: number;
+};
+
+type Payment = {
+  id: string;
+  reservation_id: string | null;
+  transaction_type: string;
+  amount: number;
+};
+
+type GuestSummary = Guest & {
+  stays: number;
+  lastStay: string | null;
+  totalValue: number;
+  outstanding: number;
+};
+
+// =========================================================
+// PAGE
+// =========================================================
+
+export default function GuestsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // =========================================================
+  // RETURN WORKFLOW
+  // =========================================================
+
+  const returnTo =
+    searchParams.get("returnTo") ?? "";
+
+  const isQuickCreate =
+    Boolean(returnTo);
+
+  // =========================================================
+  // MASTER DATA
+  // =========================================================
+
+  const [companies, setCompanies] =
+    useState<Company[]>([]);
+
+  const [guests, setGuests] =
+    useState<Guest[]>([]);
+
+  const [reservations, setReservations] =
+    useState<Reservation[]>([]);
+
+  const [payments, setPayments] =
+    useState<Payment[]>([]);
+
+  // =========================================================
+  // FORM
+  // =========================================================
+
+  const [selectedGuestId, setSelectedGuestId] =
+    useState("");
+
+  const [firstName, setFirstName] =
+    useState("");
+
+  const [surname, setSurname] =
+    useState("");
+
+  const [companyId, setCompanyId] =
+    useState("");
+
+  const [mobile, setMobile] =
+    useState("");
+
+  const [email, setEmail] =
+    useState("");
+
+  const [idNumber, setIdNumber] =
+    useState("");
+
+  const [showMore, setShowMore] =
+    useState(false);
+
+  const [nationality, setNationality] =
+    useState("");
+
+  const [address, setAddress] =
+    useState("");
+
+  const [notes, setNotes] =
+    useState("");
+
+  // =========================================================
+  // UI
+  // =========================================================
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [search, setSearch] =
+    useState("");
+
+  const [message, setMessage] =
+    useState("");
+
+  const [errorMessage, setErrorMessage] =
+    useState("");
+
+  // =========================================================
+  // INITIAL LOAD
+  // =========================================================
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  async function loadData() {
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      const [
+        companyResult,
+        guestResult,
+        reservationResult,
+        paymentResult,
+      ] = await Promise.all([
+        supabase
+          .from("companies")
+          .select("id,name")
+          .eq("is_active", true)
+          .order("name"),
+
+        supabase
+          .from("guests")
+          .select(`
+            id,
+            first_name,
+            last_name,
+            phone,
+            whatsapp_number,
+            email,
+            id_number,
+            company_id,
+            nationality,
+            address,
+            notes,
+            companies (
+              name
+            )
+          `)
+          .order("last_name")
+          .order("first_name"),
+
+        supabase
+          .from("reservations")
+          .select(`
+            id,
+            guest_id,
+            reservation_number,
+            status,
+            arrival_date,
+            departure_date,
+            total_amount
+          `),
+
+        supabase
+          .from("payments")
+          .select(`
+            id,
+            reservation_id,
+            transaction_type,
+            amount
+          `),
+      ]);
+
+      if (companyResult.error) {
+        throw new Error(companyResult.error.message);
+      }
+
+      if (guestResult.error) {
+        throw new Error(guestResult.error.message);
+      }
+
+      if (reservationResult.error) {
+        throw new Error(reservationResult.error.message);
+      }
+
+      if (paymentResult.error) {
+        throw new Error(paymentResult.error.message);
+      }
+
+      setCompanies(
+        (companyResult.data as Company[]) ?? []
+      );
+
+      setGuests(
+        (guestResult.data as unknown as Guest[]) ?? []
+      );
+
+      setReservations(
+        (reservationResult.data as Reservation[]) ?? []
+      );
+
+      setPayments(
+        (paymentResult.data as Payment[]) ?? []
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not load guest management."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // =========================================================
+  // GUEST SUMMARY
+  // =========================================================
+
+  const guestSummaries =
+    useMemo(() => {
+      return guests.map(
+        (guest): GuestSummary => {
+          const guestReservations =
+            reservations.filter(
+              (reservation) =>
+                reservation.guest_id === guest.id
+            );
+
+          const validReservations =
+            guestReservations.filter(
+              (reservation) =>
+                ![
+                  "cancelled",
+                  "no_show",
+                ].includes(
+                  reservation.status
+                )
+            );
+
+          const totalValue =
+            validReservations.reduce(
+              (total, reservation) =>
+                total +
+                Number(
+                  reservation.total_amount ?? 0
+                ),
+              0
+            );
+
+          let outstanding = 0;
+
+          for (const reservation of validReservations) {
+            const paid =
+              payments
+                .filter(
+                  (payment) =>
+                    payment.reservation_id ===
+                    reservation.id
+                )
+                .reduce(
+                  (total, payment) => {
+                    const amount =
+                      Number(
+                        payment.amount ?? 0
+                      );
+
+                    if (
+                      payment.transaction_type ===
+                      "refund"
+                    ) {
+                      return total - amount;
+                    }
+
+                    return total + amount;
+                  },
+                  0
+                );
+
+            outstanding +=
+              Math.max(
+                0,
+                Number(
+                  reservation.total_amount ?? 0
+                ) - paid
+              );
+          }
+
+          const stayDates =
+            validReservations
+              .map(
+                (reservation) =>
+                  reservation.departure_date
+              )
+              .filter(Boolean)
+              .sort()
+              .reverse();
+
+          return {
+            ...guest,
+
+            stays:
+              validReservations.length,
+
+            lastStay:
+              stayDates[0] ?? null,
+
+            totalValue,
+
+            outstanding,
+          };
+        }
+      );
+    }, [
+      guests,
+      reservations,
+      payments,
+    ]);
+
+  const filteredGuests =
+    useMemo(() => {
+      const term =
+        search
+          .trim()
+          .toLowerCase();
+
+      if (!term) {
+        return guestSummaries;
+      }
+
+      return guestSummaries.filter(
+        (guest) => {
+          const fullName =
+            `${guest.first_name} ${guest.last_name}`
+              .toLowerCase();
+
+          const organisation =
+            guest.companies?.name
+              ?.toLowerCase() ?? "";
+
+          return (
+            fullName.includes(term) ||
+            (guest.phone ?? "")
+              .toLowerCase()
+              .includes(term) ||
+            (guest.email ?? "")
+              .toLowerCase()
+              .includes(term) ||
+            (guest.id_number ?? "")
+              .toLowerCase()
+              .includes(term) ||
+            organisation.includes(term)
+          );
+        }
+      );
+    }, [
+      guestSummaries,
+      search,
+    ]);
+
+  const repeatGuests =
+    guestSummaries.filter(
+      (guest) => guest.stays > 1
+    ).length;
+
+  const guestsWithBalance =
+    guestSummaries.filter(
+      (guest) =>
+        guest.outstanding > 0
+    ).length;
+
+  const totalOutstanding =
+    guestSummaries.reduce(
+      (total, guest) =>
+        total + guest.outstanding,
+      0
+    );
+
+  // =========================================================
+  // SAVE
+  // =========================================================
+
+  async function saveGuest(
+    event: FormEvent
+  ) {
+    event.preventDefault();
+
+    if (
+      !firstName.trim() ||
+      !surname.trim() ||
+      !mobile.trim()
+    ) {
+      alert(
+        "First name, surname and mobile number are required."
+      );
+
+      return;
+    }
+
+    setSaving(true);
+    setMessage("");
+
+    try {
+      const payload = {
+        first_name:
+          firstName.trim(),
+
+        last_name:
+          surname.trim(),
+
+        phone:
+          mobile.trim(),
+
+        whatsapp_number:
+          mobile.trim(),
+
+        email:
+          email.trim() ||
+          null,
+
+        id_number:
+          idNumber.trim() ||
+          null,
+
+        company_id:
+          companyId ||
+          null,
+
+        nationality:
+          nationality.trim() ||
+          null,
+
+        address:
+          address.trim() ||
+          null,
+
+        notes:
+          notes.trim() ||
+          null,
+      };
+
+      // -----------------------------------------------------
+      // QUICK CREATE ALWAYS CREATES NEW GUEST
+      // -----------------------------------------------------
+
+      if (isQuickCreate) {
+        const {
+          data: createdGuest,
+          error,
+        } = await supabase
+          .from("guests")
+          .insert(payload)
+          .select(`
+            id,
+            first_name,
+            last_name
+          `)
+          .single();
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        if (
+          returnTo &&
+          createdGuest?.id
+        ) {
+          const separator =
+            returnTo.includes("?")
+              ? "&"
+              : "?";
+
+          router.replace(
+            `${returnTo}${separator}guestId=${encodeURIComponent(
+              createdGuest.id
+            )}`
+          );
+
+          return;
+        }
+      }
+
+      // -----------------------------------------------------
+      // NORMAL MODE - UPDATE
+      // -----------------------------------------------------
+
+      else if (selectedGuestId) {
+        const { error } =
+          await supabase
+            .from("guests")
+            .update(payload)
+            .eq(
+              "id",
+              selectedGuestId
+            );
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        setMessage(
+          `${firstName.trim()} ${surname.trim()} updated successfully.`
+        );
+      }
+
+      // -----------------------------------------------------
+      // NORMAL MODE - CREATE
+      // -----------------------------------------------------
+
+      else {
+        const {
+          data: createdGuest,
+          error,
+        } = await supabase
+          .from("guests")
+          .insert(payload)
+          .select(`
+            id,
+            first_name,
+            last_name
+          `)
+          .single();
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        setMessage(
+          `${createdGuest.first_name} ${createdGuest.last_name} saved successfully.`
+        );
+      }
+
+      clearForm();
+
+      await loadData();
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Could not save guest."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // =========================================================
+  // SELECT GUEST
+  // =========================================================
+
+  function selectGuest(
+    guest: Guest
+  ) {
+    if (isQuickCreate) {
+      return;
+    }
+
+    setSelectedGuestId(
+      guest.id
+    );
+
+    setFirstName(
+      guest.first_name ?? ""
+    );
+
+    setSurname(
+      guest.last_name ?? ""
+    );
+
+    setCompanyId(
+      guest.company_id ?? ""
+    );
+
+    setMobile(
+      guest.phone ?? ""
+    );
+
+    setEmail(
+      guest.email ?? ""
+    );
+
+    setIdNumber(
+      guest.id_number ?? ""
+    );
+
+    setNationality(
+      guest.nationality ?? ""
+    );
+
+    setAddress(
+      guest.address ?? ""
+    );
+
+    setNotes(
+      guest.notes ?? ""
+    );
+
+    setShowMore(
+      Boolean(
+        guest.nationality ||
+        guest.address ||
+        guest.notes
+      )
+    );
+
+    setMessage("");
+  }
+
+  // =========================================================
+  // CLEAR
+  // =========================================================
+
+  function clearForm() {
+    setSelectedGuestId("");
+
+    setFirstName("");
+    setSurname("");
+    setCompanyId("");
+    setMobile("");
+    setEmail("");
+    setIdNumber("");
+
+    setNationality("");
+    setAddress("");
+    setNotes("");
+
+    setShowMore(false);
+  }
+
+  // =========================================================
+  // CANCEL
+  // =========================================================
+
+  function cancelGuest() {
+    if (returnTo) {
+      router.push(
+        returnTo
+      );
+
+      return;
+    }
+
+    clearForm();
+  }
+
+  // =========================================================
+  // LOADING
+  // =========================================================
+
+  if (loading) {
+    return (
+      <main style={pageStyle}>
+        <div style={loadingBox}>
+          Loading Guest Management...
+        </div>
+      </main>
+    );
+  }
+
+  // =========================================================
+  // QUICK CREATE
+  // =========================================================
+
+  if (isQuickCreate) {
+    return (
+      <main style={quickPageStyle}>
+        <header style={brandHeader}>
+          <div style={brandIdentity}>
+            <div style={brandMark}>
+              N
+            </div>
+
+            <div>
+              <div style={brandName}>
+                NETPOS HOSPITALITY
+              </div>
+
+              <div style={brandTagline}>
+                Property Management System
+              </div>
+            </div>
+          </div>
+
+          <div style={quickBadge}>
+            QUICK CREATE
+          </div>
+        </header>
+
+        <section style={quickHeading}>
+          <button
+            type="button"
+            onClick={cancelGuest}
+            style={backButton}
+          >
+            â† Back
+          </button>
+
+          <h1 style={pageTitle}>
+            Add New Guest / Customer
+          </h1>
+
+          <p style={pageSubtitle}>
+            Capture the guest and return directly to the current transaction.
+          </p>
+        </section>
+
+        <form
+          onSubmit={saveGuest}
+          style={quickFormCard}
+        >
+          <GuestForm
+            firstName={firstName}
+            setFirstName={setFirstName}
+            surname={surname}
+            setSurname={setSurname}
+            companyId={companyId}
+            setCompanyId={setCompanyId}
+            mobile={mobile}
+            setMobile={setMobile}
+            email={email}
+            setEmail={setEmail}
+            idNumber={idNumber}
+            setIdNumber={setIdNumber}
+            nationality={nationality}
+            setNationality={setNationality}
+            address={address}
+            setAddress={setAddress}
+            notes={notes}
+            setNotes={setNotes}
+            companies={companies}
+            showMore={showMore}
+            setShowMore={setShowMore}
+            quickCreate
+          />
+
+          <div style={formActions}>
+            <button
+              type="button"
+              onClick={cancelGuest}
+              style={cancelButton}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={saving}
+              style={{
+                ...saveButton,
+                opacity:
+                  saving ? 0.6 : 1,
+              }}
+            >
+              {saving
+                ? "Saving..."
+                : "Save & Continue"}
+            </button>
+          </div>
+        </form>
+      </main>
+    );
+  }
+
+  // =========================================================
+  // NORMAL SCREEN
+  // =========================================================
+
+  return (
+    <main style={pageStyle}>
+      {/* ===================================================
+          BRAND HEADER
+      =================================================== */}
+
+      <header style={brandHeader}>
+        <div style={brandIdentity}>
+          <div style={brandMark}>
+            N
+          </div>
+
+          <div>
+            <div style={brandName}>
+              NETPOS HOSPITALITY
+            </div>
+
+            <div style={brandTagline}>
+              Property Management System
+            </div>
+          </div>
+        </div>
+
+        <div style={brandActions}>
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                "/front-desk"
+              )
+            }
+            style={brandSecondaryButton}
+          >
+            Front Desk
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                "/reservations"
+              )
+            }
+            style={brandSecondaryButton}
+          >
+            Reservations
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              clearForm();
+              setMessage("");
+            }}
+            style={brandPrimaryButton}
+          >
+            + New Guest / Customer
+          </button>
+        </div>
+      </header>
+
+      {/* ===================================================
+          TITLE + NAV
+      =================================================== */}
+
+      <section style={pageHeadingRow}>
+        <div>
+          <h1 style={pageTitle}>
+            Guest Management
+          </h1>
+
+          <div style={pageSubtitle}>
+            Capture guest details, review stay history and monitor account balances.
+          </div>
+        </div>
+
+        <div style={navigationBar}>
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                "/front-desk"
+              )
+            }
+            style={navigationButton}
+          >
+            Front Desk
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                "/reservations"
+              )
+            }
+            style={navigationButton}
+          >
+            Reservations
+          </button>
+
+          <button
+            type="button"
+            style={activeNavigationButton}
+          >
+            Guests
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                "/housekeeping"
+              )
+            }
+            style={navigationButton}
+          >
+            Housekeeping
+          </button>
+        </div>
+      </section>
+
+      {/* ===================================================
+          MESSAGE
+      =================================================== */}
+
+      {message && (
+        <div style={successBox}>
+          âœ“ {message}
+        </div>
+      )}
+
+      {errorMessage && (
+        <div style={errorBox}>
+          {errorMessage}
+        </div>
+      )}
+
+      {/* ===================================================
+          SUMMARY
+      =================================================== */}
+
+      <section style={summaryGrid}>
+        <SummaryCard
+          label="Total Guests"
+          value={String(
+            guestSummaries.length
+          )}
+          text="Guest profiles"
+          tone="blue"
+        />
+
+        <SummaryCard
+          label="Repeat Guests"
+          value={String(
+            repeatGuests
+          )}
+          text="More than one stay"
+          tone="green"
+        />
+
+        <SummaryCard
+          label="Balances Due"
+          value={String(
+            guestsWithBalance
+          )}
+          text="Guests still owing"
+          tone="warning"
+        />
+
+        <SummaryCard
+          label="Outstanding"
+          value={`N$${totalOutstanding.toFixed(
+            2
+          )}`}
+          text="Total guest balances"
+          tone="blue"
+        />
+      </section>
+
+      {/* ===================================================
+          MAIN
+      =================================================== */}
+
+      <section style={mainGrid}>
+        {/* =================================================
+            LEFT - FORM
+        ================================================= */}
+
+        <form
+          onSubmit={saveGuest}
+          style={formCard}
+        >
+          <div style={formHeading}>
+            <div>
+              <div style={panelEyebrow}>
+                {selectedGuestId
+                  ? "EDIT GUEST"
+                  : "NEW GUEST"}
+              </div>
+
+              <h2 style={formTitle}>
+                {selectedGuestId
+                  ? "Guest Details"
+                  : "Add Guest / Customer"}
+              </h2>
+
+              <div style={formSubtitle}>
+                {selectedGuestId
+                  ? "Update the selected guest record."
+                  : "First name, surname and mobile are required."}
+              </div>
+            </div>
+
+            {selectedGuestId && (
+              <button
+                type="button"
+                onClick={clearForm}
+                style={newGuestSmallButton}
+              >
+                + New
+              </button>
+            )}
+          </div>
+
+          <GuestForm
+            firstName={firstName}
+            setFirstName={setFirstName}
+            surname={surname}
+            setSurname={setSurname}
+            companyId={companyId}
+            setCompanyId={setCompanyId}
+            mobile={mobile}
+            setMobile={setMobile}
+            email={email}
+            setEmail={setEmail}
+            idNumber={idNumber}
+            setIdNumber={setIdNumber}
+            nationality={nationality}
+            setNationality={setNationality}
+            address={address}
+            setAddress={setAddress}
+            notes={notes}
+            setNotes={setNotes}
+            companies={companies}
+            showMore={showMore}
+            setShowMore={setShowMore}
+          />
+
+          <div style={formActions}>
+            <button
+              type="button"
+              onClick={clearForm}
+              style={cancelButton}
+            >
+              Clear
+            </button>
+
+            <button
+              type="submit"
+              disabled={saving}
+              style={{
+                ...saveButton,
+                opacity:
+                  saving ? 0.6 : 1,
+              }}
+            >
+              {saving
+                ? "Saving..."
+                : selectedGuestId
+                ? "Save Changes"
+                : "Save Guest"}
+            </button>
+          </div>
+        </form>
+
+        {/* =================================================
+            RIGHT - DIRECTORY
+        ================================================= */}
+
+        <section style={directoryCard}>
+          <div style={directoryHeader}>
+            <div>
+              <div style={panelEyebrow}>
+                GUEST DIRECTORY
+              </div>
+
+              <h2 style={directoryTitle}>
+                Guests & Customers
+              </h2>
+
+              <div style={directorySubtitle}>
+                Select a guest to view or edit their details.
+              </div>
+            </div>
+
+            <div style={guestCountBadge}>
+              {filteredGuests.length}
+            </div>
+          </div>
+
+          <div style={searchArea}>
+            <input
+              value={search}
+              onChange={(event) =>
+                setSearch(
+                  event.target.value
+                )
+              }
+              placeholder="Search name, mobile, email, ID or organisation..."
+              style={searchInput}
+            />
+          </div>
+
+          <div style={tableHeader}>
+            <div>Guest</div>
+            <div>Contact</div>
+            <div>Stays</div>
+            <div>Last Stay</div>
+            <div>Balance</div>
+          </div>
+
+          {filteredGuests.length === 0 ? (
+            <div style={emptyState}>
+              No guests found.
+            </div>
+          ) : (
+            <div style={guestList}>
+              {filteredGuests.map(
+                (guest) => {
+                  const selected =
+                    guest.id ===
+                    selectedGuestId;
+
+                  return (
+                    <button
+                      key={guest.id}
+                      type="button"
+                      onClick={() =>
+                        selectGuest(
+                          guest
+                        )
+                      }
+                      style={{
+                        ...guestRow,
+
+                        ...(selected
+                          ? selectedGuestRow
+                          : {}),
+                      }}
+                    >
+                      <div style={guestIdentity}>
+                        <div
+                          style={{
+                            ...avatar,
+
+                            ...(selected
+                              ? selectedAvatar
+                              : {}),
+                          }}
+                        >
+                          {initials(
+                            guest.first_name,
+                            guest.last_name
+                          )}
+                        </div>
+
+                        <div style={guestNameArea}>
+                          <strong style={guestName}>
+                            {guest.first_name}{" "}
+                            {guest.last_name}
+                          </strong>
+
+                          <span style={guestSecondary}>
+                            {guest.companies?.name ??
+                              "Private / Walk-in"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <strong style={contactText}>
+                          {guest.phone ?? "-"}
+                        </strong>
+
+                        <span style={guestSecondary}>
+                          {guest.email ??
+                            "No email"}
+                        </span>
+                      </div>
+
+                      <div>
+                        <strong style={stayCount}>
+                          {guest.stays}
+                        </strong>
+                      </div>
+
+                      <div style={dateText}>
+                        {guest.lastStay
+                          ? formatFriendlyDate(
+                              guest.lastStay
+                            )
+                          : "-"}
+                      </div>
+
+                      <div>
+                        <strong
+                          style={{
+                            ...balanceText,
+
+                            color:
+                              guest.outstanding > 0
+                                ? "#A56600"
+                                : GREEN,
+                          }}
+                        >
+                          N$
+                          {guest.outstanding.toFixed(
+                            2
+                          )}
+                        </strong>
+                      </div>
+                    </button>
+                  );
+                }
+              )}
+            </div>
+          )}
+
+          <div style={directoryFooter}>
+            <span>
+              Total guest value
+            </span>
+
+            <strong>
+              N$
+              {guestSummaries
+                .reduce(
+                  (total, guest) =>
+                    total +
+                    guest.totalValue,
+                  0
+                )
+                .toFixed(2)}
+            </strong>
+          </div>
+        </section>
+      </section>
+
+      {/* ===================================================
+          BOTTOM
+      =================================================== */}
+
+      <footer style={footerStyle}>
+        <div>
+          <strong style={footerTitle}>
+            Guest Management
+          </strong>
+
+          <div style={footerText}>
+            Guest Details â†’ Reservations â†’ Stay History â†’ Payments
+          </div>
+        </div>
+
+        <div style={footerActions}>
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                "/front-desk"
+              )
+            }
+            style={footerButton}
+          >
+            Front Desk
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                "/reservations"
+              )
+            }
+            style={footerButton}
+          >
+            Reservation Calendar
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              clearForm();
+              setMessage("");
+            }}
+            style={footerPrimaryButton}
+          >
+            + New Guest / Customer
+          </button>
+        </div>
+      </footer>
+    </main>
+  );
+}
+
+// =========================================================
+// GUEST FORM
+// =========================================================
+
+function GuestForm({
+  firstName,
+  setFirstName,
+  surname,
+  setSurname,
+  companyId,
+  setCompanyId,
+  mobile,
+  setMobile,
+  email,
+  setEmail,
+  idNumber,
+  setIdNumber,
+  nationality,
+  setNationality,
+  address,
+  setAddress,
+  notes,
+  setNotes,
+  companies,
+  showMore,
+  setShowMore,
+  quickCreate = false,
+}: {
+  firstName: string;
+  setFirstName: (value: string) => void;
+
+  surname: string;
+  setSurname: (value: string) => void;
+
+  companyId: string;
+  setCompanyId: (value: string) => void;
+
+  mobile: string;
+  setMobile: (value: string) => void;
+
+  email: string;
+  setEmail: (value: string) => void;
+
+  idNumber: string;
+  setIdNumber: (value: string) => void;
+
+  nationality: string;
+  setNationality: (value: string) => void;
+
+  address: string;
+  setAddress: (value: string) => void;
+
+  notes: string;
+  setNotes: (value: string) => void;
+
+  companies: Company[];
+
+  showMore: boolean;
+  setShowMore: (value: boolean) => void;
+
+  quickCreate?: boolean;
+}) {
+  return (
+    <>
+      <div style={twoColumnGrid}>
+        <Field
+          label="First Name"
+          required
+        >
+          <input
+            value={firstName}
+            onChange={(event) =>
+              setFirstName(
+                event.target.value
+              )
+            }
+            placeholder="First name"
+            autoFocus={quickCreate}
+            style={inputStyle}
+          />
+        </Field>
+
+        <Field
+          label="Surname"
+          required
+        >
+          <input
+            value={surname}
+            onChange={(event) =>
+              setSurname(
+                event.target.value
+              )
+            }
+            placeholder="Surname"
+            style={inputStyle}
+          />
+        </Field>
+      </div>
+
+      <div style={twoColumnGrid}>
+        <Field label="Organisation">
+          <select
+            value={companyId}
+            onChange={(event) =>
+              setCompanyId(
+                event.target.value
+              )
+            }
+            style={inputStyle}
+          >
+            <option value="">
+              Private / Walk-in
+            </option>
+
+            {companies.map(
+              (company) => (
+                <option
+                  key={company.id}
+                  value={company.id}
+                >
+                  {company.name}
+                </option>
+              )
+            )}
+          </select>
+        </Field>
+
+        <Field
+          label="Mobile Number"
+          required
+        >
+          <input
+            value={mobile}
+            onChange={(event) =>
+              setMobile(
+                event.target.value
+              )
+            }
+            placeholder="+264..."
+            style={inputStyle}
+          />
+        </Field>
+      </div>
+
+      <div style={twoColumnGrid}>
+        <Field label="Email">
+          <input
+            type="email"
+            value={email}
+            onChange={(event) =>
+              setEmail(
+                event.target.value
+              )
+            }
+            placeholder="guest@email.com"
+            style={inputStyle}
+          />
+        </Field>
+
+        <Field label="ID / Passport">
+          <input
+            value={idNumber}
+            onChange={(event) =>
+              setIdNumber(
+                event.target.value
+              )
+            }
+            placeholder="Optional"
+            style={inputStyle}
+          />
+        </Field>
+      </div>
+
+      <button
+        type="button"
+        onClick={() =>
+          setShowMore(
+            !showMore
+          )
+        }
+        style={moreButton}
+      >
+        {showMore
+          ? "Hide More Options â–²"
+          : "More Options â–¼"}
+      </button>
+
+      {showMore && (
+        <div style={moreOptionsCard}>
+          <div style={twoColumnGrid}>
+            <Field label="Nationality">
+              <input
+                value={nationality}
+                onChange={(event) =>
+                  setNationality(
+                    event.target.value
+                  )
+                }
+                placeholder="Optional"
+                style={inputStyle}
+              />
+            </Field>
+
+            <Field label="Address">
+              <input
+                value={address}
+                onChange={(event) =>
+                  setAddress(
+                    event.target.value
+                  )
+                }
+                placeholder="Optional"
+                style={inputStyle}
+              />
+            </Field>
+          </div>
+
+          <Field label="Notes">
+            <textarea
+              value={notes}
+              onChange={(event) =>
+                setNotes(
+                  event.target.value
+                )
+              }
+              placeholder="Optional guest notes..."
+              rows={2}
+              style={{
+                ...inputStyle,
+                resize: "vertical",
+              }}
+            />
+          </Field>
+        </div>
+      )}
+    </>
+  );
+}
+
+// =========================================================
+// FIELD
+// =========================================================
+
+function Field({
+  label,
+  required = false,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <label style={fieldLabel}>
+        {label}
+
+        {required && (
+          <span style={requiredMark}>
+            *
+          </span>
+        )}
+      </label>
+
+      {children}
+    </div>
+  );
+}
+
+// =========================================================
+// SUMMARY
+// =========================================================
+
+function SummaryCard({
+  label,
+  value,
+  text,
+  tone,
+}: {
+  label: string;
+  value: string;
+  text: string;
+  tone:
+    | "blue"
+    | "green"
+    | "warning";
+}) {
+  return (
+    <div
+      style={{
+        ...summaryCard,
+
+        ...(tone === "green"
+          ? summaryGreen
+          : tone === "warning"
+          ? summaryWarning
+          : summaryBlue),
+      }}
+    >
+      <div>
+        <div style={summaryLabel}>
+          {label}
+        </div>
+
+        <div style={summaryDescription}>
+          {text}
+        </div>
+      </div>
+
+      <strong style={summaryValue}>
+        {value}
+      </strong>
+    </div>
+  );
+}
+
+// =========================================================
+// HELPERS
+// =========================================================
+
+function initials(
+  firstName: string,
+  lastName: string
+) {
+  return `${firstName?.[0] ?? ""}${
+    lastName?.[0] ?? ""
+  }`.toUpperCase();
+}
+
+function parseDate(
+  value: string
+) {
+  const [
+    year,
+    month,
+    day,
+  ] = value
+    .slice(0, 10)
+    .split("-")
+    .map(Number);
+
+  return new Date(
+    Date.UTC(
+      year,
+      month - 1,
+      day
+    )
+  );
+}
+
+function formatFriendlyDate(
+  value: string
+) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat(
+    "en-NA",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    }
+  ).format(
+    parseDate(value)
+  );
+}
+
+// =========================================================
+// COLOURS
+// =========================================================
+
+const BLUE = "#0D5FA8";
+const DARK_BLUE = "#0B477F";
+const LIGHT_BLUE = "#EAF3FF";
+
+const GREEN = "#16885A";
+const LIGHT_GREEN = "#EAF7F0";
+
+const PAGE_BG = "#F4F8FC";
+const TEXT = "#17212B";
+const MUTED = "#6F7D8C";
+
+// =========================================================
+// STYLES
+// =========================================================
+
+const pageStyle: CSSProperties = {
+  minHeight: "100vh",
+  maxWidth: 1500,
+  margin: "0 auto",
+  padding: "14px 24px 12px",
+  boxSizing: "border-box",
+  fontFamily: "Arial, sans-serif",
+  color: TEXT,
+  background: PAGE_BG,
+};
+
+const quickPageStyle: CSSProperties = {
+  ...pageStyle,
+  maxWidth: 950,
+};
+
+const brandHeader: CSSProperties = {
+  minHeight: 72,
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 20,
+  padding: "10px 16px",
+  borderRadius: 12,
+  background:
+    "linear-gradient(135deg, #0B4E8A 0%, #0D668F 100%)",
+  boxShadow:
+    "0 6px 18px rgba(13,63,122,.16)",
+};
+
+const brandIdentity: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 11,
+};
+
+const brandMark: CSSProperties = {
+  width: 44,
+  height: 44,
+  borderRadius: 10,
+  background: "#fff",
+  color: DARK_BLUE,
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  fontSize: 24,
+  fontWeight: 900,
+};
+
+const brandName: CSSProperties = {
+  color: "#fff",
+  fontSize: 20,
+  fontWeight: 900,
+  letterSpacing: 1.2,
+};
+
+const brandTagline: CSSProperties = {
+  marginTop: 2,
+  color: "#D7E7FA",
+  fontSize: 9,
+};
+
+const brandActions: CSSProperties = {
+  display: "flex",
+  gap: 7,
+  alignItems: "center",
+};
+
+const brandSecondaryButton: CSSProperties = {
+  border:
+    "1px solid rgba(255,255,255,.55)",
+  borderRadius: 7,
+  background:
+    "rgba(255,255,255,.08)",
+  color: "#fff",
+  padding: "8px 11px",
+  fontSize: 9,
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const brandPrimaryButton: CSSProperties = {
+  ...brandSecondaryButton,
+  borderColor: "#fff",
+  background: "#fff",
+  color: DARK_BLUE,
+  padding: "9px 13px",
+};
+
+const quickBadge: CSSProperties = {
+  padding: "7px 11px",
+  borderRadius: 20,
+  background: "#fff",
+  color: DARK_BLUE,
+  fontSize: 8,
+  fontWeight: 900,
+  letterSpacing: 0.6,
+};
+
+const quickHeading: CSSProperties = {
+  padding: "15px 2px 8px",
+};
+
+const backButton: CSSProperties = {
+  border: 0,
+  background: "transparent",
+  padding: 0,
+  color: BLUE,
+  fontSize: 10,
+  fontWeight: 800,
+  cursor: "pointer",
+  marginBottom: 6,
+};
+
+const pageHeadingRow: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 20,
+  margin: "10px 0 8px",
+};
+
+const pageTitle: CSSProperties = {
+  margin: 0,
+  color: DARK_BLUE,
+  fontSize: 27,
+  lineHeight: 1.05,
+};
+
+const pageSubtitle: CSSProperties = {
+  margin: "4px 0 0",
+  color: MUTED,
+  fontSize: 10,
+};
+
+const navigationBar: CSSProperties = {
+  display: "flex",
+  gap: 3,
+  padding: 3,
+  border: "1px solid #CBD6E2",
+  borderRadius: 8,
+  background: "#E9EEF5",
+};
+
+const navigationButton: CSSProperties = {
+  border: 0,
+  borderRadius: 6,
+  padding: "7px 11px",
+  background: "transparent",
+  color: "#596777",
+  fontSize: 9,
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const activeNavigationButton: CSSProperties = {
+  ...navigationButton,
+  background: BLUE,
+  color: "#fff",
+};
+
+const successBox: CSSProperties = {
+  marginBottom: 8,
+  padding: "7px 10px",
+  border: "1px solid #A9D5BC",
+  borderRadius: 7,
+  background: LIGHT_GREEN,
+  color: GREEN,
+  fontSize: 9,
+  fontWeight: 800,
+};
+
+const errorBox: CSSProperties = {
+  marginBottom: 8,
+  padding: "7px 10px",
+  border: "1px solid #E0AAAA",
+  borderRadius: 7,
+  background: "#FFF1F1",
+  color: "#A11A1A",
+  fontSize: 9,
+};
+
+const summaryGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns:
+    "repeat(4,minmax(0,1fr))",
+  gap: 8,
+  marginBottom: 8,
+};
+
+const summaryCard: CSSProperties = {
+  minHeight: 66,
+  padding: "9px 12px",
+  border: "1px solid",
+  borderRadius: 9,
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12,
+  background: "#fff",
+};
+
+const summaryBlue: CSSProperties = {
+  borderColor: "#B9D0EA",
+};
+
+const summaryGreen: CSSProperties = {
+  borderColor: "#AED9C2",
+  background: "#FAFFFC",
+};
+
+const summaryWarning: CSSProperties = {
+  borderColor: "#E5C795",
+  background: "#FFFDF8",
+};
+
+const summaryLabel: CSSProperties = {
+  color: DARK_BLUE,
+  fontSize: 8,
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: 0.4,
+};
+
+const summaryDescription: CSSProperties = {
+  marginTop: 3,
+  color: MUTED,
+  fontSize: 8,
+};
+
+const summaryValue: CSSProperties = {
+  color: DARK_BLUE,
+  fontSize: 22,
+};
+
+const mainGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns:
+    "minmax(420px,.8fr) minmax(0,1.4fr)",
+  gap: 9,
+  alignItems: "start",
+};
+
+const formCard: CSSProperties = {
+  border: "1px solid #CBD8E5",
+  borderRadius: 10,
+  background: "#fff",
+  padding: 12,
+  display: "grid",
+  gap: 10,
+  boxShadow:
+    "0 2px 8px rgba(31,73,125,.05)",
+};
+
+const quickFormCard: CSSProperties = {
+  ...formCard,
+  padding: 16,
+};
+
+const formHeading: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 10,
+  paddingBottom: 8,
+  borderBottom: "1px solid #E4EAF0",
+};
+
+const panelEyebrow: CSSProperties = {
+  color: BLUE,
+  fontSize: 7,
+  fontWeight: 900,
+  letterSpacing: 0.6,
+  marginBottom: 2,
+};
+
+const formTitle: CSSProperties = {
+  margin: 0,
+  color: DARK_BLUE,
+  fontSize: 16,
+};
+
+const formSubtitle: CSSProperties = {
+  marginTop: 3,
+  color: MUTED,
+  fontSize: 8,
+};
+
+const newGuestSmallButton: CSSProperties = {
+  border: "1px solid #9ECDB5",
+  borderRadius: 6,
+  background: LIGHT_GREEN,
+  color: GREEN,
+  padding: "6px 9px",
+  fontSize: 8,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const twoColumnGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 10,
+};
+
+const fieldLabel: CSSProperties = {
+  display: "block",
+  color: "#536577",
+  fontSize: 9,
+  fontWeight: 800,
+  marginBottom: 4,
+};
+
+const requiredMark: CSSProperties = {
+  color: "#A11A1A",
+  marginLeft: 3,
+};
+
+const inputStyle: CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "9px 10px",
+  border: "1px solid #BBC9D7",
+  borderRadius: 7,
+  background: "#fff",
+  color: TEXT,
+  fontSize: 11,
+};
+
+const moreButton: CSSProperties = {
+  border: "1px solid #C5D2DF",
+  borderRadius: 7,
+  background: "#F8FAFC",
+  color: BLUE,
+  padding: 7,
+  fontSize: 8,
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const moreOptionsCard: CSSProperties = {
+  padding: 9,
+  border: "1px solid #DCE5ED",
+  borderRadius: 8,
+  background: "#F8FAFC",
+  display: "grid",
+  gap: 9,
+};
+
+const formActions: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: 7,
+  paddingTop: 9,
+  borderTop: "1px solid #E4EAF0",
+};
+
+const cancelButton: CSSProperties = {
+  border: "1px solid #C2CEDA",
+  borderRadius: 6,
+  background: "#fff",
+  color: "#536577",
+  padding: "8px 12px",
+  fontSize: 9,
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const saveButton: CSSProperties = {
+  border: 0,
+  borderRadius: 6,
+  background: GREEN,
+  color: "#fff",
+  padding: "9px 14px",
+  fontSize: 9,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const directoryCard: CSSProperties = {
+  border: "1px solid #CBD8E5",
+  borderRadius: 10,
+  background: "#fff",
+  overflow: "hidden",
+  boxShadow:
+    "0 2px 8px rgba(31,73,125,.05)",
+};
+
+const directoryHeader: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 10,
+  padding: "10px 12px",
+  borderBottom: "1px solid #E4EAF0",
+  background: "#F8FAFD",
+};
+
+const directoryTitle: CSSProperties = {
+  margin: 0,
+  color: DARK_BLUE,
+  fontSize: 16,
+};
+
+const directorySubtitle: CSSProperties = {
+  marginTop: 3,
+  color: MUTED,
+  fontSize: 8,
+};
+
+const guestCountBadge: CSSProperties = {
+  minWidth: 36,
+  height: 30,
+  padding: "0 8px",
+  borderRadius: 20,
+  background: LIGHT_BLUE,
+  color: BLUE,
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  fontSize: 13,
+  fontWeight: 900,
+};
+
+const searchArea: CSSProperties = {
+  padding: "8px 10px",
+  borderBottom: "1px solid #E4EAF0",
+};
+
+const searchInput: CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "9px 10px",
+  border: "1px solid #BBC9D7",
+  borderRadius: 7,
+  fontSize: 10,
+};
+
+const tableHeader: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns:
+    "1.45fr 1.25fr .5fr .85fr .7fr",
+  gap: 10,
+  padding: "7px 10px",
+  background: "#EFF4F9",
+  color: "#56697D",
+  fontSize: 7,
+  fontWeight: 900,
+  textTransform: "uppercase",
+};
+
+const guestList: CSSProperties = {
+  maxHeight:
+    "calc(100vh - 430px)",
+  minHeight: 250,
+  overflowY: "auto",
+};
+
+const guestRow: CSSProperties = {
+  width: "100%",
+  display: "grid",
+  gridTemplateColumns:
+    "1.45fr 1.25fr .5fr .85fr .7fr",
+  gap: 10,
+  alignItems: "center",
+  border: 0,
+  borderBottom: "1px solid #E8EDF2",
+  background: "#fff",
+  padding: "8px 10px",
+  textAlign: "left",
+  color: TEXT,
+  cursor: "pointer",
+};
+
+const selectedGuestRow: CSSProperties = {
+  background: "#EEF5FF",
+  boxShadow:
+    "inset 4px 0 0 #1557A6",
+};
+
+const guestIdentity: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  minWidth: 0,
+};
+
+const avatar: CSSProperties = {
+  width: 30,
+  height: 30,
+  flexShrink: 0,
+  borderRadius: "50%",
+  background: LIGHT_BLUE,
+  color: BLUE,
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  fontSize: 9,
+  fontWeight: 900,
+};
+
+const selectedAvatar: CSSProperties = {
+  background: BLUE,
+  color: "#fff",
+};
+
+const guestNameArea: CSSProperties = {
+  minWidth: 0,
+};
+
+const guestName: CSSProperties = {
+  display: "block",
+  fontSize: 9,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
+
+const guestSecondary: CSSProperties = {
+  display: "block",
+  marginTop: 2,
+  color: MUTED,
+  fontSize: 7,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
+
+const contactText: CSSProperties = {
+  display: "block",
+  fontSize: 8,
+};
+
+const stayCount: CSSProperties = {
+  color: BLUE,
+  fontSize: 13,
+};
+
+const dateText: CSSProperties = {
+  color: "#516274",
+  fontSize: 8,
+};
+
+const balanceText: CSSProperties = {
+  fontSize: 9,
+};
+
+const directoryFooter: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  padding: "7px 10px",
+  borderTop: "1px solid #E4EAF0",
+  background: "#F8FAFD",
+  color: "#536577",
+  fontSize: 8,
+};
+
+const emptyState: CSSProperties = {
+  padding: 28,
+  textAlign: "center",
+  color: MUTED,
+  fontSize: 9,
+};
+
+const footerStyle: CSSProperties = {
+  marginTop: 8,
+  padding: "8px 10px",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 15,
+  border: "1px solid #CBD8E5",
+  borderRadius: 9,
+  background: "#fff",
+};
+
+const footerTitle: CSSProperties = {
+  color: DARK_BLUE,
+  fontSize: 9,
+};
+
+const footerText: CSSProperties = {
+  marginTop: 2,
+  color: MUTED,
+  fontSize: 7,
+};
+
+const footerActions: CSSProperties = {
+  display: "flex",
+  gap: 6,
+};
+
+const footerButton: CSSProperties = {
+  border: "1px solid #A8BED7",
+  borderRadius: 6,
+  background: "#fff",
+  color: BLUE,
+  padding: "7px 10px",
+  fontSize: 8,
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const footerPrimaryButton: CSSProperties = {
+  ...footerButton,
+  borderColor: GREEN,
+  background: GREEN,
+  color: "#fff",
+};
+
+const loadingBox: CSSProperties = {
+  padding: 35,
+  border: "1px solid #CBD8E5",
+  borderRadius: 9,
+  background: "#fff",
+  textAlign: "center",
+  color: MUTED,
+  fontSize: 10,
+};
+

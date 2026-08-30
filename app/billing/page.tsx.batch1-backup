@@ -1,0 +1,210 @@
+﻿"use client";
+
+import Link from "next/link";
+import { type CSSProperties } from "react";
+
+export default function BillingPage() {
+  return (
+    <main style={page}>
+      <section style={hero}>
+        <div style={brandRow}>
+          <div style={mark}>N</div>
+          <div>
+            <h1 style={brand}>NETPOS HOSPITALITY</h1>
+            <div style={subtitle}>Billing & Accounts</div>
+          </div>
+        </div>
+
+        <Link href="/reservations" style={primaryButton}>
+          Open Reservations
+        </Link>
+      </section>
+
+      <section style={content}>
+        <div style={headingRow}>
+          <div>
+            <h2 style={heading}>Billing</h2>
+            <p style={muted}>
+              Quotations, guest accounts, invoices, payments and daily financial activity.
+            </p>
+          </div>
+        </div>
+
+        <div style={grid}>
+          <Link href="/quotations" style={card}>
+            <div style={cardIcon}>01</div>
+            <h3 style={cardTitle}>Quotations</h3>
+            <p style={cardText}>
+              Create professional room quotations, print or save them as PDF,
+              track status and start a reservation from an accepted quote.
+            </p>
+            <span style={cardAction}>Open Quotations â†’</span>
+          </Link>
+
+          <Link href="/reservations" style={card}>
+            <div style={cardIcon}>02</div>
+            <h3 style={cardTitle}>Reservation Accounts</h3>
+            <p style={cardText}>
+              Open reservations to view invoices, record payments, check
+              balances and print guest documents.
+            </p>
+            <span style={cardAction}>Open Reservations â†’</span>
+          </Link>
+
+          <Link href="/front-desk" style={card}>
+            <div style={cardIcon}>03</div>
+            <h3 style={cardTitle}>Outstanding Accounts</h3>
+            <p style={cardText}>
+              Review guests and reservations that still have money outstanding.
+            </p>
+            <span style={cardAction}>View Outstanding â†’</span>
+          </Link>
+
+          <Link href="/cash-up" style={card}>
+            <div style={cardIcon}>04</div>
+            <h3 style={cardTitle}>X Report / End of Day</h3>
+            <p style={cardText}>
+              Review Cash, Card, EFT and refunds for the current trading period.
+            </p>
+            <span style={cardAction}>Open X Report â†’</span>
+          </Link>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+const page: CSSProperties = {
+  minHeight: "100vh",
+  background: "#F3F7FB",
+  color: "#17324D",
+  fontFamily: "Arial, sans-serif",
+};
+
+const hero: CSSProperties = {
+  margin: "14px 22px 0",
+  padding: "17px 20px",
+  borderRadius: 14,
+  background: "linear-gradient(135deg,#0C3D78,#1764B0)",
+  color: "#fff",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 20,
+};
+
+const brandRow: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+};
+
+const mark: CSSProperties = {
+  width: 44,
+  height: 44,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 10,
+  background: "#FFFFFF",
+  color: "#0D4E94",
+  fontSize: 24,
+  fontWeight: 900,
+};
+
+const brand: CSSProperties = {
+  margin: 0,
+  fontSize: 22,
+  letterSpacing: 1.2,
+};
+
+const subtitle: CSSProperties = {
+  marginTop: 4,
+  fontSize: 10,
+  opacity: 0.9,
+};
+
+const primaryButton: CSSProperties = {
+  textDecoration: "none",
+  padding: "10px 14px",
+  borderRadius: 8,
+  background: "#FFFFFF",
+  color: "#0D4E94",
+  fontSize: 10,
+  fontWeight: 900,
+};
+
+const content: CSSProperties = {
+  padding: "18px 22px 28px",
+};
+
+const headingRow: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-end",
+  marginBottom: 14,
+};
+
+const heading: CSSProperties = {
+  margin: 0,
+  color: "#0D3F7A",
+  fontSize: 26,
+};
+
+const muted: CSSProperties = {
+  margin: "5px 0 0",
+  color: "#6A7C90",
+  fontSize: 11,
+};
+
+const grid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))",
+  gap: 13,
+};
+
+const card: CSSProperties = {
+  minHeight: 180,
+  padding: 17,
+  border: "1px solid #D7E2EC",
+  borderRadius: 12,
+  background: "#FFFFFF",
+  color: "#17324D",
+  textDecoration: "none",
+  boxShadow: "0 5px 15px rgba(15,60,105,.06)",
+};
+
+const cardIcon: CSSProperties = {
+  width: 34,
+  height: 34,
+  borderRadius: 9,
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  background: "#EAF4FF",
+  color: "#0D4E94",
+  fontSize: 10,
+  fontWeight: 900,
+};
+
+const cardTitle: CSSProperties = {
+  margin: "13px 0 7px",
+  color: "#0D3F7A",
+  fontSize: 16,
+};
+
+const cardText: CSSProperties = {
+  minHeight: 48,
+  margin: 0,
+  color: "#66788C",
+  fontSize: 10,
+  lineHeight: 1.55,
+};
+
+const cardAction: CSSProperties = {
+  display: "inline-block",
+  marginTop: 13,
+  color: "#178A57",
+  fontSize: 10,
+  fontWeight: 900,
+};

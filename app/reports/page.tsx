@@ -1,0 +1,2487 @@
+"use client";
+
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+} from "react";
+
+import { useRouter } from "next/navigation";
+import { supabase } from "@/src/lib/supabase";
+
+// =========================================================
+// TYPES
+// =========================================================
+
+type Property = {
+  id: string;
+  name: string;
+};
+
+type Guest = {
+  id: string;
+  first_name: string;
+  last_name: string;
+};
+
+type ReservationRoom = {
+  id: string;
+  reservation_id: string;
+  room_id: string | null;
+  room_type_id: string;
+  nightly_rate: number;
+  arrival_date: string;
+  departure_date: string;
+};
+
+type Reservation = {
+  id: string;
+  property_id: string;
+  guest_id: string;
+  reservation_number: string;
+  status: string;
+  booking_source: string | null;
+  arrival_date: string;
+  departure_date: string;
+  adults: number;
+  children: number;
+  total_amount: number;
+  cancelled_at: string | null;
+};
+
+type Room = {
+  id: string;
+  property_id: string;
+  room_number: string;
+  room_name: string | null;
+  room_type_id: string;
+  operational_status: string | null;
+};
+
+type RoomType = {
+  id: string;
+  name: string;
+};
+
+type Payment = {
+  id: string;
+  property_id: string;
+  reservation_id: string | null;
+  payment_method: string;
+  transaction_type: string;
+  amount: number;
+  received_at: string;
+};
+
+type Invoice = {
+  id: string;
+  property_id: string;
+  reservation_id: string | null;
+  status: string;
+  total_amount: number;
+};
+
+type RoomPerformanceRow = {
+  roomId: string;
+  roomNumber: string;
+  roomType: string;
+  availableNights: number;
+  soldNights: number;
+  occupancy: number;
+  revenue: number;
+  adr: number;
+};
+
+type PieItem = {
+  label: string;
+  value: number;
+  amount?: number;
+};
+
+// =========================================================
+// PAGE
+// =========================================================
+
+export default function ReportsPage() {
+  const router = useRouter();
+
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [propertyId, setPropertyId] = useState("");
+
+  const [startDate, setStartDate] = useState(
+    addDays(getTodayString(), -7)
+  );
+  const [endDate, setEndDate] = useState(
+    getTodayString()
+  );
+
+  const [guests, setGuests] = useState<Guest[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [reservationRooms, setReservationRooms] = useState<ReservationRoom[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [generatedAt, setGeneratedAt] = useState(new Date());
+
+  // =========================================================
+  // LOAD
+  // =========================================================
+
+  useEffect(() => {
+    initialise();
+  }, []);
+
+  async function initialise() {
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("id,name")
+        .order("name");
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      const rows = (data as Property[]) ?? [];
+      setProperties(rows);
+
+      const firstPropertyId = rows[0]?.id ?? "";
+      setPropertyId(firstPropertyId);
+
+      if (firstPropertyId) {
+        await runReport(firstPropertyId, startDate, endDate);
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not load report."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runReport(
+    selectedPropertyId = propertyId,
+    selectedStartDate = startDate,
+    selectedEndDate = endDate
+  ) {
+    if (!selectedPropertyId || !selectedStartDate || !selectedEndDate) {
+      return;
+    }
+
+    if (selectedStartDate > selectedEndDate) {
+      setErrorMessage("Start date cannot be after end date.");
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      const [
+        guestResult,
+        reservationResult,
+        roomResult,
+        roomTypeResult,
+        paymentResult,
+        invoiceResult,
+      ] = await Promise.all([
+        supabase
+          .from("guests")
+          .select("id,first_name,last_name"),
+
+        supabase
+          .from("reservations")
+          .select(`
+            id,
+            property_id,
+            guest_id,
+            reservation_number,
+            status,
+            booking_source,
+            arrival_date,
+            departure_date,
+            adults,
+            children,
+            total_amount,
+            cancelled_at
+          `)
+          .eq("property_id", selectedPropertyId),
+
+        supabase
+          .from("rooms")
+          .select(`
+            id,
+            property_id,
+            room_number,
+            room_name,
+            room_type_id,
+            operational_status
+          `)
+          .eq("property_id", selectedPropertyId)
+          .order("room_number"),
+
+        supabase
+          .from("room_types")
+          .select("id,name")
+          .eq("property_id", selectedPropertyId)
+          .order("name"),
+
+        supabase
+          .from("payments")
+          .select(`
+            id,
+            property_id,
+            reservation_id,
+            payment_method,
+            transaction_type,
+            amount,
+            received_at
+          `)
+          .eq("property_id", selectedPropertyId)
+          .order("received_at"),
+
+        supabase
+          .from("invoices")
+          .select(`
+            id,
+            property_id,
+            reservation_id,
+            status,
+            total_amount
+          `)
+          .eq("property_id", selectedPropertyId)
+          .neq("status", "void"),
+      ]);
+
+      if (guestResult.error) {
+        throw new Error(`Guests: ${guestResult.error.message}`);
+      }
+
+      if (reservationResult.error) {
+        throw new Error(`Reservations: ${reservationResult.error.message}`);
+      }
+
+      if (roomResult.error) {
+        throw new Error(`Rooms: ${roomResult.error.message}`);
+      }
+
+      if (roomTypeResult.error) {
+        throw new Error(`Room Types: ${roomTypeResult.error.message}`);
+      }
+
+      if (paymentResult.error) {
+        throw new Error(`Payments: ${paymentResult.error.message}`);
+      }
+
+      if (invoiceResult.error) {
+        throw new Error(`Invoices: ${invoiceResult.error.message}`);
+      }
+
+      const loadedReservations =
+        (reservationResult.data as Reservation[]) ?? [];
+
+      const reservationIds = loadedReservations.map(
+        (reservation) => reservation.id
+      );
+
+      let loadedReservationRooms: ReservationRoom[] = [];
+
+      if (reservationIds.length > 0) {
+        const { data, error } = await supabase
+          .from("reservation_rooms")
+          .select(`
+            id,
+            reservation_id,
+            room_id,
+            room_type_id,
+            nightly_rate,
+            arrival_date,
+            departure_date
+          `)
+          .in("reservation_id", reservationIds);
+
+        if (error) {
+          throw new Error(`Reservation Rooms: ${error.message}`);
+        }
+
+        loadedReservationRooms =
+          (data as ReservationRoom[]) ?? [];
+      }
+
+      setGuests((guestResult.data as Guest[]) ?? []);
+      setReservations(loadedReservations);
+      setReservationRooms(loadedReservationRooms);
+      setRooms((roomResult.data as Room[]) ?? []);
+      setRoomTypes((roomTypeResult.data as RoomType[]) ?? []);
+      setPayments((paymentResult.data as Payment[]) ?? []);
+      setInvoices((invoiceResult.data as Invoice[]) ?? []);
+      setGeneratedAt(new Date());
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not generate report."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function changeProperty(value: string) {
+    setPropertyId(value);
+    await runReport(value, startDate, endDate);
+  }
+
+  // =========================================================
+  // LOOKUPS
+  // =========================================================
+
+  const guestsById = useMemo(() => {
+    const map = new Map<string, Guest>();
+
+    for (const guest of guests) {
+      map.set(guest.id, guest);
+    }
+
+    return map;
+  }, [guests]);
+
+  const roomTypesById = useMemo(() => {
+    const map = new Map<string, RoomType>();
+
+    for (const roomType of roomTypes) {
+      map.set(roomType.id, roomType);
+    }
+
+    return map;
+  }, [roomTypes]);
+
+  const roomsById = useMemo(() => {
+    const map = new Map<string, Room>();
+
+    for (const room of rooms) {
+      map.set(room.id, room);
+    }
+
+    return map;
+  }, [rooms]);
+
+  const reservationsById = useMemo(() => {
+    const map = new Map<string, Reservation>();
+
+    for (const reservation of reservations) {
+      map.set(reservation.id, reservation);
+    }
+
+    return map;
+  }, [reservations]);
+
+  // =========================================================
+  // PERIOD / ACTIVE STAYS
+  // =========================================================
+
+  const periodDays = Math.max(
+    1,
+    differenceInDays(
+      startDate,
+      addDays(endDate, 1)
+    )
+  );
+
+  const activeStayStatuses = [
+    "provisional",
+    "confirmed",
+    "checked_in",
+    "checked_out",
+  ];
+
+  const stayReservations = useMemo(() => {
+    const endExclusive = addDays(endDate, 1);
+
+    return reservations.filter(
+      (reservation) =>
+        activeStayStatuses.includes(reservation.status) &&
+        reservation.arrival_date < endExclusive &&
+        reservation.departure_date > startDate
+    );
+  }, [reservations, startDate, endDate]);
+
+  const cancelledReservations = useMemo(() => {
+    const endExclusiveTimestamp = new Date(
+      `${addDays(endDate, 1)}T00:00:00`
+    ).getTime();
+
+    const startTimestamp = new Date(
+      `${startDate}T00:00:00`
+    ).getTime();
+
+    return reservations.filter((reservation) => {
+      if (reservation.status !== "cancelled") {
+        return false;
+      }
+
+      if (!reservation.cancelled_at) {
+        return false;
+      }
+
+      const cancelledAt = new Date(
+        reservation.cancelled_at
+      ).getTime();
+
+      return (
+        cancelledAt >= startTimestamp &&
+        cancelledAt < endExclusiveTimestamp
+      );
+    });
+  }, [reservations, startDate, endDate]);
+
+  const noShowReservations = useMemo(() => {
+    return reservations.filter(
+      (reservation) =>
+        reservation.status === "no_show" &&
+        reservation.arrival_date >= startDate &&
+        reservation.arrival_date <= endDate
+    );
+  }, [reservations, startDate, endDate]);
+
+  // =========================================================
+  // ROOM NIGHT / REVENUE CALCULATION
+  // =========================================================
+
+  const roomPerformance = useMemo(() => {
+    const rows: RoomPerformanceRow[] = [];
+
+    const activeRooms = rooms.filter(
+      (room) => room.operational_status !== "out_of_service"
+    );
+
+    for (const room of activeRooms) {
+      const relatedRoomRows = reservationRooms.filter(
+        (reservationRoom) =>
+          reservationRoom.room_id === room.id
+      );
+
+      let soldNights = 0;
+      let revenue = 0;
+
+      for (const reservationRoom of relatedRoomRows) {
+        const reservation = reservationsById.get(
+          reservationRoom.reservation_id
+        );
+
+        if (
+          !reservation ||
+          !activeStayStatuses.includes(reservation.status)
+        ) {
+          continue;
+        }
+
+        const nightsInPeriod = overlapNights(
+          reservationRoom.arrival_date,
+          reservationRoom.departure_date,
+          startDate,
+          addDays(endDate, 1)
+        );
+
+        if (nightsInPeriod <= 0) {
+          continue;
+        }
+
+        soldNights += nightsInPeriod;
+        revenue +=
+          nightsInPeriod *
+          Number(reservationRoom.nightly_rate ?? 0);
+      }
+
+      const availableNights = periodDays;
+      const occupancy =
+        availableNights > 0
+          ? (soldNights / availableNights) * 100
+          : 0;
+
+      const adr =
+        soldNights > 0
+          ? revenue / soldNights
+          : 0;
+
+      rows.push({
+        roomId: room.id,
+        roomNumber: room.room_number,
+        roomType:
+          roomTypesById.get(room.room_type_id)?.name ??
+          "-",
+        availableNights,
+        soldNights,
+        occupancy,
+        revenue,
+        adr,
+      });
+    }
+
+    return rows.sort((a, b) =>
+      a.roomNumber.localeCompare(
+        b.roomNumber,
+        undefined,
+        { numeric: true }
+      )
+    );
+  }, [
+    rooms,
+    reservationRooms,
+    reservationsById,
+    roomTypesById,
+    startDate,
+    endDate,
+    periodDays,
+  ]);
+
+  const roomNightsSold = roomPerformance.reduce(
+    (total, row) => total + row.soldNights,
+    0
+  );
+
+  const roomNightsAvailable = roomPerformance.reduce(
+    (total, row) => total + row.availableNights,
+    0
+  );
+
+  const occupancyAverage =
+    roomNightsAvailable > 0
+      ? (roomNightsSold / roomNightsAvailable) * 100
+      : 0;
+
+  const accommodationRevenue = roomPerformance.reduce(
+    (total, row) => total + row.revenue,
+    0
+  );
+
+  // =========================================================
+  // GUEST COUNTS
+  // =========================================================
+
+  const totalAdults = stayReservations.reduce(
+    (total, reservation) =>
+      total + Number(reservation.adults ?? 0),
+    0
+  );
+
+  const totalChildren = stayReservations.reduce(
+    (total, reservation) =>
+      total + Number(reservation.children ?? 0),
+    0
+  );
+
+  const totalGuests = totalAdults + totalChildren;
+
+  const uniqueGuests = new Set(
+    stayReservations.map(
+      (reservation) => reservation.guest_id
+    )
+  ).size;
+
+  // =========================================================
+  // PAYMENTS
+  // IMPORTANT:
+  // Management Reports only show payments linked to the
+  // reservations represented in the selected stay period.
+  // X Report remains the true cash-received-by-trading-day report.
+  // =========================================================
+
+  function signedPayment(payment: Payment) {
+    const amount = Number(payment.amount ?? 0);
+
+    return payment.transaction_type === "refund"
+      ? -amount
+      : amount;
+  }
+
+  const reportReservationIds = useMemo(() => {
+    return new Set(
+      stayReservations.map(
+        (reservation) => reservation.id
+      )
+    );
+  }, [stayReservations]);
+
+  const reportPayments = useMemo(() => {
+    return payments.filter(
+      (payment) =>
+        Boolean(payment.reservation_id) &&
+        reportReservationIds.has(
+          payment.reservation_id as string
+        )
+    );
+  }, [payments, reportReservationIds]);
+
+  function paymentMethodTotal(method: string) {
+    return reportPayments
+      .filter(
+        (payment) => payment.payment_method === method
+      )
+      .reduce(
+        (total, payment) =>
+          total + signedPayment(payment),
+        0
+      );
+  }
+
+  const cashTotal = paymentMethodTotal("cash");
+  const cardTotal = paymentMethodTotal("card");
+  const eftTotal = paymentMethodTotal("eft");
+  const accountTotal = paymentMethodTotal("account");
+
+  const refundTotal = reportPayments
+    .filter(
+      (payment) =>
+        payment.transaction_type === "refund"
+    )
+    .reduce(
+      (total, payment) =>
+        total + Number(payment.amount ?? 0),
+      0
+    );
+
+  const grossPayments = reportPayments
+    .filter(
+      (payment) =>
+        payment.transaction_type !== "refund"
+    )
+    .reduce(
+      (total, payment) =>
+        total + Number(payment.amount ?? 0),
+      0
+    );
+
+  const netPayments = reportPayments.reduce(
+    (total, payment) =>
+      total + signedPayment(payment),
+    0
+  );
+
+  // =========================================================
+  // OUTSTANDING
+  // Uses all payment history for the reservations in this
+  // report so deposits paid before the date range still count.
+  // =========================================================
+
+  const allPaymentsByReservation = useMemo(() => {
+    const map = new Map<string, number>();
+
+    for (const payment of payments) {
+      if (!payment.reservation_id) {
+        continue;
+      }
+
+      map.set(
+        payment.reservation_id,
+        (map.get(payment.reservation_id) ?? 0) +
+          signedPayment(payment)
+      );
+    }
+
+    return map;
+  }, [payments]);
+
+  const outstanding = stayReservations.reduce(
+    (total, reservation) => {
+      const paid =
+        allPaymentsByReservation.get(reservation.id) ?? 0;
+
+      return (
+        total +
+        Math.max(
+          0,
+          Number(reservation.total_amount ?? 0) - paid
+        )
+      );
+    },
+    0
+  );
+
+  const outstandingReservations = stayReservations.filter(
+    (reservation) => {
+      const paid =
+        allPaymentsByReservation.get(reservation.id) ?? 0;
+
+      return (
+        Number(reservation.total_amount ?? 0) - paid >
+        0.009
+      );
+    }
+  ).length;
+
+  // =========================================================
+  // BOOKING SOURCE
+  // =========================================================
+
+  const bookingSourceItems = useMemo(() => {
+    const totals = new Map<string, number>();
+
+    for (const reservationRoom of reservationRooms) {
+      const reservation = reservationsById.get(
+        reservationRoom.reservation_id
+      );
+
+      if (
+        !reservation ||
+        !activeStayStatuses.includes(reservation.status)
+      ) {
+        continue;
+      }
+
+      const nights = overlapNights(
+        reservationRoom.arrival_date,
+        reservationRoom.departure_date,
+        startDate,
+        addDays(endDate, 1)
+      );
+
+      if (nights <= 0) {
+        continue;
+      }
+
+      const source = formatBookingSource(
+        reservation.booking_source
+      );
+
+      const value =
+        nights *
+        Number(reservationRoom.nightly_rate ?? 0);
+
+      totals.set(
+        source,
+        (totals.get(source) ?? 0) + value
+      );
+    }
+
+    return Array.from(totals.entries())
+      .map(([label, value]) => ({
+        label,
+        value,
+        amount: value,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [
+    reservationRooms,
+    reservationsById,
+    startDate,
+    endDate,
+  ]);
+
+  const paymentPieItems: PieItem[] = [
+    {
+      label: "Cash",
+      value: Math.max(0, cashTotal),
+      amount: cashTotal,
+    },
+    {
+      label: "Card",
+      value: Math.max(0, cardTotal),
+      amount: cardTotal,
+    },
+    {
+      label: "EFT",
+      value: Math.max(0, eftTotal),
+      amount: eftTotal,
+    },
+    {
+      label: "Account",
+      value: Math.max(0, accountTotal),
+      amount: accountTotal,
+    },
+  ].filter((item) => item.value > 0);
+
+  const guestPieItems: PieItem[] = [
+    {
+      label: "Adults",
+      value: totalAdults,
+    },
+    {
+      label: "Children",
+      value: totalChildren,
+    },
+  ].filter((item) => item.value > 0);
+
+  // =========================================================
+  // PRINT
+  // =========================================================
+
+  function printReport() {
+    const propertyName =
+      properties.find(
+        (property) => property.id === propertyId
+      )?.name ?? "Property";
+
+    const roomRows = roomPerformance
+      .map(
+        (row) => `
+          <tr>
+            <td>${escapeHtml(row.roomNumber)}</td>
+            <td>${escapeHtml(row.roomType)}</td>
+            <td class="right">${row.availableNights}</td>
+            <td class="right">${row.soldNights}</td>
+            <td class="right">${row.occupancy.toFixed(1)}%</td>
+            <td class="right">${money(row.revenue)}</td>
+            <td class="right">${money(row.adr)}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    const paymentRows = [
+      ["Cash", cashTotal],
+      ["Card", cardTotal],
+      ["EFT", eftTotal],
+      ["Account", accountTotal],
+    ]
+      .map(
+        ([label, amount]) => `
+          <tr>
+            <td>${label}</td>
+            <td class="right">${money(Number(amount))}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    const sourceRows = bookingSourceItems
+      .map(
+        (item) => `
+          <tr>
+            <td>${escapeHtml(item.label)}</td>
+            <td class="right">${money(item.amount ?? 0)}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    const html = `
+<!doctype html>
+<html>
+<head>
+  <title>Management Report ${startDate} to ${endDate}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      color: #142033;
+      margin: 24px;
+      font-size: 11px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      border-bottom: 3px solid #1557A6;
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+    h1 {
+      margin: 0;
+      color: #0D3F7A;
+      font-size: 24px;
+    }
+    .brand {
+      font-weight: 900;
+      color: #0D3F7A;
+      font-size: 17px;
+    }
+    .period {
+      margin-top: 4px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #1557A6;
+    }
+    .muted {
+      color: #6F7D8C;
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 7px;
+      margin: 12px 0;
+    }
+    .kpi {
+      border: 1px solid #CCD8E5;
+      border-radius: 7px;
+      padding: 8px;
+    }
+    .kpi-label {
+      color: #617286;
+      font-size: 8px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .kpi-value {
+      margin-top: 4px;
+      color: #0D3F7A;
+      font-size: 16px;
+      font-weight: 900;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .section {
+      margin-top: 12px;
+      break-inside: avoid;
+    }
+    .section h2 {
+      color: #0D3F7A;
+      font-size: 12px;
+      margin: 0 0 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      border-bottom: 1px solid #E2E8EF;
+      padding: 5px 6px;
+      text-align: left;
+    }
+    th {
+      background: #EFF4F9;
+      color: #516578;
+      font-size: 8px;
+      text-transform: uppercase;
+    }
+    .right { text-align: right; }
+    .bottom-total {
+      margin-top: 14px;
+      border: 2px solid #1557A6;
+      background: #F2F7FD;
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .bottom-total strong {
+      color: #0D3F7A;
+      font-size: 22px;
+    }
+    .footer {
+      margin-top: 10px;
+      font-size: 9px;
+      color: #6F7D8C;
+      display: flex;
+      justify-content: space-between;
+    }
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 10mm;
+      }
+      body {
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="brand">NETPOS HOSPITALITY</div>
+      <h1>Management Report</h1>
+      <div>${escapeHtml(propertyName)}</div>
+      <div class="period">
+        REPORT PERIOD: ${escapeHtml(formatDate(startDate))}
+        — ${escapeHtml(formatDate(endDate))}
+      </div>
+    </div>
+    <div class="muted">
+      Generated: ${escapeHtml(formatDateTime(generatedAt.toISOString()))}
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="kpi-label">Accommodation Revenue</div>
+      <div class="kpi-value">${money(accommodationRevenue)}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Total Guests</div>
+      <div class="kpi-value">${totalGuests}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Occupancy</div>
+      <div class="kpi-value">${occupancyAverage.toFixed(1)}%</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Room Nights Sold</div>
+      <div class="kpi-value">${roomNightsSold}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Outstanding</div>
+      <div class="kpi-value">${money(outstanding)}</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="section">
+      <h2>Payment Summary — Payments Linked to Reported Stays</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th class="right">Net Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${paymentRows}
+          <tr>
+            <td><strong>Refunds</strong></td>
+            <td class="right"><strong>${money(refundTotal)}</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Net Payments</strong></td>
+            <td class="right"><strong>${money(netPayments)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Reservation Summary</h2>
+      <table>
+        <tbody>
+          <tr><td>Total Active Stays</td><td class="right">${stayReservations.length}</td></tr>
+          <tr><td>Unique Guests / Customers</td><td class="right">${uniqueGuests}</td></tr>
+          <tr><td>Adults</td><td class="right">${totalAdults}</td></tr>
+          <tr><td>Children</td><td class="right">${totalChildren}</td></tr>
+          <tr><td>Cancellations</td><td class="right">${cancelledReservations.length}</td></tr>
+          <tr><td>No Shows</td><td class="right">${noShowReservations.length}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="section">
+      <h2>Revenue by Booking Source</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th class="right">Revenue</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${
+            sourceRows ||
+            `<tr><td colspan="2">No booking-source revenue.</td></tr>`
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Financial Snapshot</h2>
+      <table>
+        <tbody>
+          <tr><td>Gross Payments</td><td class="right">${money(grossPayments)}</td></tr>
+          <tr><td>Refunds</td><td class="right">${money(refundTotal)}</td></tr>
+          <tr><td>Net Payments</td><td class="right">${money(netPayments)}</td></tr>
+          <tr><td>Outstanding</td><td class="right">${money(outstanding)}</td></tr>
+          <tr><td>Outstanding Reservations</td><td class="right">${outstandingReservations}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Room Performance</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Room</th>
+          <th>Room Type</th>
+          <th class="right">Available Nights</th>
+          <th class="right">Sold Nights</th>
+          <th class="right">Occupancy</th>
+          <th class="right">Revenue</th>
+          <th class="right">ADR</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${
+          roomRows ||
+          `<tr><td colspan="7">No room performance data.</td></tr>`
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bottom-total">
+    <div>
+      <div class="muted">TOTAL ACCOMMODATION REVENUE FOR SELECTED PERIOD</div>
+      <div class="period">
+        ${escapeHtml(formatDate(startDate))}
+        — ${escapeHtml(formatDate(endDate))}
+      </div>
+    </div>
+    <strong>${money(accommodationRevenue)}</strong>
+  </div>
+
+  <div class="footer">
+    <span>NETPOS HOSPITALITY</span>
+    <span>Report period: ${escapeHtml(startDate)} to ${escapeHtml(endDate)}</span>
+  </div>
+
+  <script>
+    window.onload = function () {
+      window.print();
+    };
+  </script>
+</body>
+</html>
+    `;
+
+    const printWindow = window.open(
+      "",
+      "_blank",
+      "width=1100,height=850"
+    );
+
+    if (!printWindow) {
+      alert(
+        "Please allow pop-ups so the report can be printed or saved as PDF."
+      );
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+
+  // =========================================================
+  // SCREEN
+  // =========================================================
+
+  return (
+    <main style={pageStyle}>
+      {/* HEADER */}
+
+      <header style={brandHeader}>
+        <div style={brandIdentity}>
+          <div style={brandMark}>N</div>
+
+          <div>
+            <div style={brandName}>
+              NETPOS HOSPITALITY
+            </div>
+
+            <div style={brandTagline}>
+              Property Management System
+            </div>
+          </div>
+        </div>
+
+        <div style={headerControls}>
+          <div style={propertyArea}>
+            <label style={headerLabel}>
+              PROPERTY
+            </label>
+
+            <select
+              value={propertyId}
+              onChange={(event) =>
+                changeProperty(event.target.value)
+              }
+              style={headerSelect}
+            >
+              {properties.map((property) => (
+                <option
+                  key={property.id}
+                  value={property.id}
+                >
+                  {property.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={dateRangeBox}>
+            <div>
+              <label style={headerLabel}>
+                FROM
+              </label>
+
+              <input
+                type="date"
+                value={startDate}
+                onChange={(event) =>
+                  setStartDate(event.target.value)
+                }
+                style={headerDateInput}
+              />
+            </div>
+
+            <span style={dateArrow}>→</span>
+
+            <div>
+              <label style={headerLabel}>
+                TO
+              </label>
+
+              <input
+                type="date"
+                value={endDate}
+                onChange={(event) =>
+                  setEndDate(event.target.value)
+                }
+                style={headerDateInput}
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              runReport(propertyId, startDate, endDate)
+            }
+            style={runButton}
+          >
+            Run Report
+          </button>
+        </div>
+      </header>
+
+      {/* TITLE */}
+
+      <section style={pageHeading}>
+        <div>
+          <h1 style={pageTitle}>
+            Management Report
+          </h1>
+
+          <div style={pageSubtitle}>
+            Owner overview for{" "}
+            <strong>
+              {formatDate(startDate)}
+            </strong>{" "}
+            to{" "}
+            <strong>
+              {formatDate(endDate)}
+            </strong>
+          </div>
+        </div>
+
+        <div style={headingActions}>
+          <button
+            type="button"
+            onClick={() => router.back()}
+            style={secondaryButton}
+          >
+            Back
+          </button>
+
+          <button
+            type="button"
+            onClick={printReport}
+            style={printButton}
+          >
+            Print / Save PDF
+          </button>
+        </div>
+      </section>
+
+      {errorMessage && (
+        <div style={errorBox}>
+          {errorMessage}
+        </div>
+      )}
+
+      {/* KPI */}
+
+      <section style={kpiGrid}>
+        <KpiCard
+          label="Accommodation Revenue"
+          value={money(accommodationRevenue)}
+          detail="Room-night revenue"
+          tone="blue"
+        />
+
+        <KpiCard
+          label="Total Guests"
+          value={String(totalGuests)}
+          detail={`Adults ${totalAdults} · Children ${totalChildren}`}
+          tone="green"
+        />
+
+        <KpiCard
+          label="Occupancy"
+          value={`${occupancyAverage.toFixed(1)}%`}
+          detail={`${roomNightsSold} sold / ${roomNightsAvailable} available`}
+          tone="gold"
+        />
+
+        <KpiCard
+          label="Room Nights Sold"
+          value={String(roomNightsSold)}
+          detail={`${periodDays} day report period`}
+          tone="purple"
+        />
+
+        <KpiCard
+          label="Cancellations"
+          value={String(cancelledReservations.length)}
+          detail={`${noShowReservations.length} no show${
+            noShowReservations.length === 1 ? "" : "s"
+          }`}
+          tone="red"
+        />
+
+        <KpiCard
+          label="Outstanding"
+          value={money(outstanding)}
+          detail={`${outstandingReservations} reservation${
+            outstandingReservations === 1 ? "" : "s"
+          }`}
+          tone="neutral"
+        />
+      </section>
+
+      {/* MAIN */}
+
+      <section style={dashboardGrid}>
+        {/* LEFT */}
+
+        <div style={leftReportColumn}>
+          <section style={panel}>
+            <PanelHeader
+              title="Summary by Payment Method"
+              subtitle="Payments linked to stays in selected date range"
+            />
+
+            <div style={paymentTableHeader}>
+              <div>Payment Method</div>
+              <div>Net Total</div>
+              <div>% of Net</div>
+            </div>
+
+            {[
+              ["Cash", cashTotal],
+              ["Card", cardTotal],
+              ["EFT", eftTotal],
+              ["Account", accountTotal],
+            ].map(([label, amount]) => {
+              const numericAmount = Number(amount);
+
+              const percentage =
+                netPayments !== 0
+                  ? (numericAmount / netPayments) * 100
+                  : 0;
+
+              return (
+                <div
+                  key={String(label)}
+                  style={paymentTableRow}
+                >
+                  <strong>{label}</strong>
+                  <strong>{money(numericAmount)}</strong>
+                  <span style={percentageText}>
+                    {percentage.toFixed(1)}%
+                  </span>
+                </div>
+              );
+            })}
+
+            <div style={paymentTotalRow}>
+              <strong>Refunds</strong>
+              <strong style={redText}>
+                {money(refundTotal)}
+              </strong>
+              <span />
+            </div>
+
+            <div style={paymentTotalRow}>
+              <strong>NET PAYMENTS</strong>
+              <strong style={greenText}>
+                {money(netPayments)}
+              </strong>
+              <strong>100%</strong>
+            </div>
+          </section>
+
+          <div style={smallPanelsGrid}>
+            <section style={panel}>
+              <PanelHeader
+                title="Reservation Summary"
+                subtitle="Selected report period"
+              />
+
+              <MetricRow
+                label="Active stays"
+                value={String(stayReservations.length)}
+              />
+
+              <MetricRow
+                label="Unique guests / customers"
+                value={String(uniqueGuests)}
+              />
+
+              <MetricRow
+                label="Adults"
+                value={String(totalAdults)}
+              />
+
+              <MetricRow
+                label="Children"
+                value={String(totalChildren)}
+              />
+
+              <MetricRow
+                label="Cancellations"
+                value={String(cancelledReservations.length)}
+                danger
+              />
+
+              <MetricRow
+                label="No Shows"
+                value={String(noShowReservations.length)}
+                danger
+              />
+            </section>
+
+            <section style={panel}>
+              <PanelHeader
+                title="Financial Snapshot"
+                subtitle="Cashflow and debtors"
+              />
+
+              <MetricRow
+                label="Gross payments"
+                value={money(grossPayments)}
+              />
+
+              <MetricRow
+                label="Refunds"
+                value={money(refundTotal)}
+                danger
+              />
+
+              <MetricRow
+                label="Net payments"
+                value={money(netPayments)}
+                success
+              />
+
+              <MetricRow
+                label="Outstanding"
+                value={money(outstanding)}
+                danger={outstanding > 0}
+              />
+
+              <MetricRow
+                label="Outstanding reservations"
+                value={String(outstandingReservations)}
+              />
+            </section>
+          </div>
+
+          <section style={panel}>
+            <PanelHeader
+              title="Room Performance"
+              subtitle="Occupancy, room-night revenue and ADR"
+            />
+
+            <div style={roomTableHeader}>
+              <div>Room</div>
+              <div>Room Type</div>
+              <div>Available</div>
+              <div>Sold</div>
+              <div>Occupancy</div>
+              <div>Revenue</div>
+              <div>ADR</div>
+            </div>
+
+            <div style={roomTableScroll}>
+              {loading ? (
+                <div style={emptyState}>
+                  Loading report...
+                </div>
+              ) : roomPerformance.length === 0 ? (
+                <div style={emptyState}>
+                  No room performance data.
+                </div>
+              ) : (
+                roomPerformance.map((row) => (
+                  <div
+                    key={row.roomId}
+                    style={roomTableRow}
+                  >
+                    <strong style={roomNumberText}>
+                      {row.roomNumber}
+                    </strong>
+
+                    <span>{row.roomType}</span>
+
+                    <span>{row.availableNights}</span>
+
+                    <span>{row.soldNights}</span>
+
+                    <strong>
+                      {row.occupancy.toFixed(1)}%
+                    </strong>
+
+                    <strong>
+                      {money(row.revenue)}
+                    </strong>
+
+                    <span>{money(row.adr)}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </div>
+
+        {/* RIGHT */}
+
+        <aside style={rightReportColumn}>
+          <section style={panel}>
+            <PanelHeader
+              title="Payments by Method"
+              subtitle="Payments for stays represented in this report"
+            />
+
+            <PieChart
+              items={paymentPieItems}
+              centerValue={money(netPayments)}
+              centerLabel="Net Payments"
+            />
+          </section>
+
+          <section style={panel}>
+            <PanelHeader
+              title="Revenue by Booking Source"
+              subtitle="Accommodation revenue"
+            />
+
+            <PieChart
+              items={bookingSourceItems}
+              centerValue={money(accommodationRevenue)}
+              centerLabel="Revenue"
+            />
+          </section>
+
+          <section style={panel}>
+            <PanelHeader
+              title="Guest Breakdown"
+              subtitle={`${uniqueGuests} unique guest/customer record${
+                uniqueGuests === 1 ? "" : "s"
+              }`}
+            />
+
+            <PieChart
+              items={guestPieItems}
+              centerValue={String(totalGuests)}
+              centerLabel="Total Guests"
+            />
+          </section>
+        </aside>
+      </section>
+
+      {/* REVENUE TOTAL BOTTOM */}
+
+      <section style={revenueFooter}>
+        <div>
+          <div style={revenueFooterLabel}>
+            TOTAL ACCOMMODATION REVENUE
+          </div>
+
+          <div style={revenueFooterPeriod}>
+            {formatDate(startDate)} — {formatDate(endDate)}
+          </div>
+        </div>
+
+        <strong style={revenueFooterValue}>
+          {money(accommodationRevenue)}
+        </strong>
+      </section>
+
+      <footer style={reportFooter}>
+        <span>
+          Generated {formatDateTime(generatedAt.toISOString())}
+        </span>
+
+        <span>
+          Report period: {startDate} to {endDate}
+        </span>
+
+        <button
+          type="button"
+          onClick={printReport}
+          style={printFooterButton}
+        >
+          Print / Save PDF
+        </button>
+      </footer>
+    </main>
+  );
+}
+
+// =========================================================
+// COMPONENTS
+// =========================================================
+
+function KpiCard({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone:
+    | "blue"
+    | "green"
+    | "gold"
+    | "purple"
+    | "red"
+    | "neutral";
+}) {
+  const toneMap: Record<string, CSSProperties> = {
+    blue: {
+      borderColor: "#B7D2F0",
+      background: "#F5FAFF",
+    },
+    green: {
+      borderColor: "#B5DEC7",
+      background: "#F5FFF9",
+    },
+    gold: {
+      borderColor: "#E7CF95",
+      background: "#FFFCF3",
+    },
+    purple: {
+      borderColor: "#D3C5ED",
+      background: "#FBF8FF",
+    },
+    red: {
+      borderColor: "#E8BBBB",
+      background: "#FFF8F8",
+    },
+    neutral: {
+      borderColor: "#CBD6E2",
+      background: "#FAFBFC",
+    },
+  };
+
+  return (
+    <div
+      style={{
+        ...kpiCard,
+        ...toneMap[tone],
+      }}
+    >
+      <div style={kpiLabel}>{label}</div>
+      <strong style={kpiValue}>{value}</strong>
+      <div style={kpiDetail}>{detail}</div>
+    </div>
+  );
+}
+
+function PanelHeader({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div style={panelHeader}>
+      <div>
+        <h2 style={panelTitle}>{title}</h2>
+        <div style={panelSubtitle}>{subtitle}</div>
+      </div>
+    </div>
+  );
+}
+
+function MetricRow({
+  label,
+  value,
+  danger = false,
+  success = false,
+}: {
+  label: string;
+  value: string;
+  danger?: boolean;
+  success?: boolean;
+}) {
+  return (
+    <div style={metricRow}>
+      <span>{label}</span>
+
+      <strong
+        style={{
+          color: danger
+            ? RED
+            : success
+            ? GREEN
+            : TEXT,
+        }}
+      >
+        {value}
+      </strong>
+    </div>
+  );
+}
+
+function PieChart({
+  items,
+  centerValue,
+  centerLabel,
+}: {
+  items: PieItem[];
+  centerValue: string;
+  centerLabel: string;
+}) {
+  const total = items.reduce(
+    (sum, item) => sum + Math.max(0, item.value),
+    0
+  );
+
+  const palette = [
+    "#2E6EDB",
+    "#22945B",
+    "#F39A17",
+    "#8154C5",
+    "#1D9BB3",
+    "#D65858",
+    "#66798D",
+  ];
+
+  let cursor = 0;
+
+  const segments = items.map((item, index) => {
+    const percentage =
+      total > 0 ? (Math.max(0, item.value) / total) * 100 : 0;
+
+    const start = cursor;
+    const end = cursor + percentage;
+    cursor = end;
+
+    return `${palette[index % palette.length]} ${start}% ${end}%`;
+  });
+
+  const background =
+    segments.length > 0
+      ? `conic-gradient(${segments.join(",")})`
+      : "#E9EEF4";
+
+  return (
+    <div style={pieLayout}>
+      <div style={pieWrap}>
+        <div
+          style={{
+            ...pieCircle,
+            background,
+          }}
+        >
+          <div style={pieCenter}>
+            <strong style={pieCenterValue}>
+              {centerValue}
+            </strong>
+
+            <span style={pieCenterLabel}>
+              {centerLabel}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div style={pieLegend}>
+        {items.length === 0 ? (
+          <div style={emptyLegend}>
+            No data for selected period.
+          </div>
+        ) : (
+          items.map((item, index) => {
+            const percentage =
+              total > 0
+                ? (item.value / total) * 100
+                : 0;
+
+            return (
+              <div
+                key={`${item.label}-${index}`}
+                style={legendRow}
+              >
+                <span
+                  style={{
+                    ...legendDot,
+                    background:
+                      palette[index % palette.length],
+                  }}
+                />
+
+                <span style={legendLabel}>
+                  {item.label}
+                </span>
+
+                <strong style={legendPercent}>
+                  {percentage.toFixed(1)}%
+                </strong>
+
+                {item.amount !== undefined && (
+                  <span style={legendAmount}>
+                    {money(item.amount)}
+                  </span>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =========================================================
+// HELPERS
+// =========================================================
+
+function getTodayString() {
+  const now = new Date();
+
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function parseDate(value: string) {
+  const [year, month, day] = value
+    .slice(0, 10)
+    .split("-")
+    .map(Number);
+
+  return new Date(
+    Date.UTC(year, month - 1, day)
+  );
+}
+
+function addDays(value: string, days: number) {
+  const date = parseDate(value);
+
+  date.setUTCDate(date.getUTCDate() + days);
+
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function differenceInDays(
+  start: string,
+  endExclusive: string
+) {
+  return Math.max(
+    0,
+    Math.round(
+      (parseDate(endExclusive).getTime() -
+        parseDate(start).getTime()) /
+        86400000
+    )
+  );
+}
+
+function overlapNights(
+  stayStart: string,
+  stayEnd: string,
+  reportStart: string,
+  reportEndExclusive: string
+) {
+  const start = Math.max(
+    parseDate(stayStart).getTime(),
+    parseDate(reportStart).getTime()
+  );
+
+  const end = Math.min(
+    parseDate(stayEnd).getTime(),
+    parseDate(reportEndExclusive).getTime()
+  );
+
+  return Math.max(
+    0,
+    Math.round((end - start) / 86400000)
+  );
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("en-NA", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(parseDate(value));
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("en-NA", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatBookingSource(
+  source: string | null
+) {
+  if (!source) {
+    return "Other";
+  }
+
+  const values: Record<string, string> = {
+    walk_in: "Walk-in",
+    phone: "Phone",
+    whatsapp: "WhatsApp",
+    email: "Email",
+    website: "Website",
+    agent: "Agent",
+    corporate: "Corporate",
+    other: "Other",
+  };
+
+  return values[source] ?? source;
+}
+
+function money(value: number) {
+  return `N$${Number(value ?? 0).toFixed(2)}`;
+}
+
+function escapeHtml(value: string) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+// =========================================================
+// COLOURS
+// =========================================================
+
+const BLUE = "#0D5FA8";
+const DARK_BLUE = "#0B477F";
+const GREEN = "#16885A";
+const RED = "#A32626";
+const PAGE_BG = "#F4F8FC";
+const TEXT = "#17212B";
+const MUTED = "#6F7D8C";
+
+// =========================================================
+// STYLES
+// =========================================================
+
+const pageStyle: CSSProperties = {
+  minHeight: "100vh",
+  maxWidth: 1550,
+  margin: "0 auto",
+  padding: "12px 20px 10px",
+  boxSizing: "border-box",
+  background: PAGE_BG,
+  color: TEXT,
+  fontFamily: "Arial, sans-serif",
+};
+
+const brandHeader: CSSProperties = {
+  minHeight: 70,
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 18,
+  padding: "9px 15px",
+  borderRadius: 12,
+  background:
+    "linear-gradient(135deg, #0B4E8A 0%, #0D668F 100%)",
+  boxShadow:
+    "0 5px 16px rgba(13,63,122,.15)",
+};
+
+const brandIdentity: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+};
+
+const brandMark: CSSProperties = {
+  width: 43,
+  height: 43,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 10,
+  background: "#fff",
+  color: DARK_BLUE,
+  fontSize: 23,
+  fontWeight: 900,
+};
+
+const brandName: CSSProperties = {
+  color: "#fff",
+  fontSize: 19,
+  fontWeight: 900,
+  letterSpacing: 1.1,
+};
+
+const brandTagline: CSSProperties = {
+  marginTop: 2,
+  color: "#D9E8FA",
+  fontSize: 8,
+};
+
+const headerControls: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-end",
+  gap: 7,
+};
+
+const propertyArea: CSSProperties = {
+  width: 235,
+};
+
+const headerLabel: CSSProperties = {
+  display: "block",
+  color: "#E3EEFB",
+  fontSize: 7,
+  fontWeight: 900,
+  marginBottom: 3,
+};
+
+const headerSelect: CSSProperties = {
+  width: "100%",
+  padding: "8px 9px",
+  border: "1px solid rgba(255,255,255,.55)",
+  borderRadius: 7,
+  background: "#fff",
+  color: TEXT,
+  fontSize: 9,
+  fontWeight: 700,
+};
+
+const dateRangeBox: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-end",
+  gap: 5,
+  padding: "5px 7px",
+  border: "1px solid rgba(255,255,255,.35)",
+  borderRadius: 8,
+  background: "rgba(255,255,255,.08)",
+};
+
+const headerDateInput: CSSProperties = {
+  width: 122,
+  padding: "7px 8px",
+  border: "1px solid rgba(255,255,255,.5)",
+  borderRadius: 6,
+  background: "#fff",
+  color: TEXT,
+  fontSize: 8,
+  fontWeight: 700,
+};
+
+const dateArrow: CSSProperties = {
+  color: "#fff",
+  fontSize: 13,
+  paddingBottom: 6,
+};
+
+const runButton: CSSProperties = {
+  border: "1px solid #2AB673",
+  borderRadius: 7,
+  padding: "9px 12px",
+  background: GREEN,
+  color: "#fff",
+  fontSize: 8,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const pageHeading: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 16,
+  margin: "9px 0 7px",
+};
+
+const pageTitle: CSSProperties = {
+  margin: 0,
+  color: DARK_BLUE,
+  fontSize: 24,
+};
+
+const pageSubtitle: CSSProperties = {
+  marginTop: 2,
+  color: MUTED,
+  fontSize: 9,
+};
+
+const headingActions: CSSProperties = {
+  display: "flex",
+  gap: 6,
+};
+
+const secondaryButton: CSSProperties = {
+  border: "1px solid #AFC0D2",
+  borderRadius: 6,
+  padding: "7px 10px",
+  background: "#fff",
+  color: BLUE,
+  fontSize: 8,
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const printButton: CSSProperties = {
+  ...secondaryButton,
+  borderColor: BLUE,
+  background: BLUE,
+  color: "#fff",
+};
+
+const errorBox: CSSProperties = {
+  marginBottom: 7,
+  padding: "7px 9px",
+  border: "1px solid #E2A9A9",
+  borderRadius: 7,
+  background: "#FFF2F2",
+  color: RED,
+  fontSize: 8,
+};
+
+const kpiGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(6,minmax(0,1fr))",
+  gap: 7,
+  marginBottom: 7,
+};
+
+const kpiCard: CSSProperties = {
+  minHeight: 69,
+  padding: "8px 9px",
+  border: "1px solid",
+  borderRadius: 8,
+  textAlign: "center",
+};
+
+const kpiLabel: CSSProperties = {
+  color: "#5C6D80",
+  fontSize: 7,
+  fontWeight: 900,
+  textTransform: "uppercase",
+};
+
+const kpiValue: CSSProperties = {
+  display: "block",
+  marginTop: 4,
+  color: DARK_BLUE,
+  fontSize: 16,
+};
+
+const kpiDetail: CSSProperties = {
+  marginTop: 3,
+  color: MUTED,
+  fontSize: 7,
+};
+
+const dashboardGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0,1.7fr) minmax(315px,.8fr)",
+  gap: 7,
+};
+
+const leftReportColumn: CSSProperties = {
+  display: "grid",
+  gap: 7,
+};
+
+const rightReportColumn: CSSProperties = {
+  display: "grid",
+  gap: 7,
+  gridTemplateRows: "repeat(3,minmax(0,1fr))",
+};
+
+const panel: CSSProperties = {
+  border: "1px solid #CBD8E5",
+  borderRadius: 9,
+  background: "#fff",
+  overflow: "hidden",
+};
+
+const panelHeader: CSSProperties = {
+  padding: "7px 9px",
+  borderBottom: "1px solid #E2E9F0",
+  background: "#F8FAFD",
+};
+
+const panelTitle: CSSProperties = {
+  margin: 0,
+  color: DARK_BLUE,
+  fontSize: 10,
+  textTransform: "uppercase",
+};
+
+const panelSubtitle: CSSProperties = {
+  marginTop: 2,
+  color: MUTED,
+  fontSize: 7,
+};
+
+const paymentTableHeader: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1.4fr 1fr .7fr",
+  gap: 8,
+  padding: "6px 9px",
+  background: "#EFF4F9",
+  color: "#56697D",
+  fontSize: 7,
+  fontWeight: 900,
+  textTransform: "uppercase",
+};
+
+const paymentTableRow: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1.4fr 1fr .7fr",
+  gap: 8,
+  padding: "6px 9px",
+  borderBottom: "1px solid #E9EEF3",
+  fontSize: 8,
+};
+
+const paymentTotalRow: CSSProperties = {
+  ...paymentTableRow,
+  background: "#FAFBFD",
+};
+
+const percentageText: CSSProperties = {
+  color: GREEN,
+  fontWeight: 900,
+};
+
+const redText: CSSProperties = {
+  color: RED,
+};
+
+const greenText: CSSProperties = {
+  color: GREEN,
+};
+
+const smallPanelsGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 7,
+};
+
+const metricRow: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  padding: "5px 9px",
+  borderBottom: "1px solid #EDF1F5",
+  fontSize: 8,
+};
+
+const roomTableHeader: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: ".6fr 1fr .7fr .55fr .75fr .9fr .75fr",
+  gap: 7,
+  padding: "6px 9px",
+  background: "#EFF4F9",
+  color: "#56697D",
+  fontSize: 7,
+  fontWeight: 900,
+  textTransform: "uppercase",
+};
+
+const roomTableRow: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: ".6fr 1fr .7fr .55fr .75fr .9fr .75fr",
+  gap: 7,
+  alignItems: "center",
+  padding: "6px 9px",
+  borderBottom: "1px solid #E9EEF3",
+  fontSize: 8,
+};
+
+const roomTableScroll: CSSProperties = {
+  maxHeight: "190px",
+  overflowY: "auto",
+};
+
+const roomNumberText: CSSProperties = {
+  color: DARK_BLUE,
+  fontSize: 9,
+};
+
+const emptyState: CSSProperties = {
+  padding: 22,
+  color: MUTED,
+  fontSize: 8,
+  textAlign: "center",
+};
+
+const pieLayout: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "130px 1fr",
+  gap: 10,
+  alignItems: "center",
+  padding: "8px 10px",
+  minHeight: 145,
+};
+
+const pieWrap: CSSProperties = {
+  display: "flex",
+  justifyContent: "center",
+};
+
+const pieCircle: CSSProperties = {
+  width: 112,
+  height: 112,
+  borderRadius: "50%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const pieCenter: CSSProperties = {
+  width: 67,
+  height: 67,
+  borderRadius: "50%",
+  background: "#fff",
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+  alignItems: "center",
+  textAlign: "center",
+  boxShadow: "0 0 0 1px rgba(0,0,0,.04)",
+};
+
+const pieCenterValue: CSSProperties = {
+  color: DARK_BLUE,
+  fontSize: 11,
+};
+
+const pieCenterLabel: CSSProperties = {
+  marginTop: 2,
+  color: MUTED,
+  fontSize: 6,
+};
+
+const pieLegend: CSSProperties = {
+  display: "grid",
+  gap: 5,
+};
+
+const legendRow: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "10px 1fr 42px 72px",
+  gap: 5,
+  alignItems: "center",
+  fontSize: 7,
+};
+
+const legendDot: CSSProperties = {
+  width: 7,
+  height: 7,
+  borderRadius: "50%",
+};
+
+const legendLabel: CSSProperties = {
+  color: TEXT,
+};
+
+const legendPercent: CSSProperties = {
+  textAlign: "right",
+  color: DARK_BLUE,
+};
+
+const legendAmount: CSSProperties = {
+  textAlign: "right",
+  color: MUTED,
+};
+
+const emptyLegend: CSSProperties = {
+  color: MUTED,
+  fontSize: 8,
+};
+
+const revenueFooter: CSSProperties = {
+  marginTop: 7,
+  padding: "9px 13px",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 20,
+  border: "1px solid #9FC2E8",
+  borderRadius: 9,
+  background: "#EEF6FF",
+};
+
+const revenueFooterLabel: CSSProperties = {
+  color: BLUE,
+  fontSize: 8,
+  fontWeight: 900,
+};
+
+const revenueFooterPeriod: CSSProperties = {
+  marginTop: 2,
+  color: MUTED,
+  fontSize: 7,
+};
+
+const revenueFooterValue: CSSProperties = {
+  color: DARK_BLUE,
+  fontSize: 21,
+};
+
+const reportFooter: CSSProperties = {
+  marginTop: 6,
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12,
+  color: MUTED,
+  fontSize: 7,
+};
+
+const printFooterButton: CSSProperties = {
+  border: 0,
+  borderRadius: 6,
+  padding: "7px 10px",
+  background: BLUE,
+  color: "#fff",
+  fontSize: 7,
+  fontWeight: 900,
+  cursor: "pointer",
+};

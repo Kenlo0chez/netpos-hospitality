@@ -1,0 +1,1125 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/src/lib/supabase";
+
+// =========================================================
+// TYPES
+// =========================================================
+
+type Property = {
+  id: string;
+  name: string;
+};
+
+type Room = {
+  id: string;
+  property_id: string;
+  room_number: string;
+  room_name: string | null;
+  housekeeping_status: string | null;
+  operational_status: string;
+};
+
+// =========================================================
+// PAGE
+// =========================================================
+
+export default function HousekeepingPage() {
+  const router = useRouter();
+
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [propertyId, setPropertyId] = useState("");
+  const [rooms, setRooms] = useState<Room[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [loadingRooms, setLoadingRooms] = useState(false);
+  const [updatingRoomId, setUpdatingRoomId] = useState("");
+
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  // =========================================================
+  // INITIAL LOAD
+  // =========================================================
+
+  useEffect(() => {
+    initialisePage();
+  }, []);
+
+  async function initialisePage() {
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("id,name")
+        .order("name");
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      const rows = (data as Property[]) ?? [];
+
+      setProperties(rows);
+
+      if (rows.length > 0) {
+        const firstPropertyId = rows[0].id;
+
+        setPropertyId(firstPropertyId);
+
+        await loadRooms(firstPropertyId);
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not load housekeeping."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // =========================================================
+  // LOAD ROOMS
+  // =========================================================
+
+  async function loadRooms(selectedPropertyId: string) {
+    if (!selectedPropertyId) {
+      setRooms([]);
+      return;
+    }
+
+    setLoadingRooms(true);
+    setErrorMessage("");
+
+    try {
+      const { data, error } = await supabase
+        .from("rooms")
+        .select(`
+          id,
+          property_id,
+          room_number,
+          room_name,
+          housekeeping_status,
+          operational_status
+        `)
+        .eq("property_id", selectedPropertyId)
+        .order("room_number");
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setRooms((data as Room[]) ?? []);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not load rooms."
+      );
+    } finally {
+      setLoadingRooms(false);
+    }
+  }
+
+  // =========================================================
+  // PROPERTY CHANGE
+  // =========================================================
+
+  async function changeProperty(value: string) {
+    setPropertyId(value);
+    setMessage("");
+    setErrorMessage("");
+
+    await loadRooms(value);
+  }
+
+  // =========================================================
+  // CHANGE HOUSEKEEPING STATUS
+  // =========================================================
+
+  async function changeHousekeepingStatus(
+    room: Room,
+    status: "clean" | "dirty" | "cleaning"
+  ) {
+    if (room.operational_status !== "active") {
+      return;
+    }
+
+    if (
+      normaliseHousekeepingStatus(room.housekeeping_status) === status
+    ) {
+      return;
+    }
+
+    setUpdatingRoomId(room.id);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const { error } = await supabase
+        .from("rooms")
+        .update({
+          housekeeping_status: status,
+        })
+        .eq("id", room.id);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setRooms((currentRooms) =>
+        currentRooms.map((currentRoom) =>
+          currentRoom.id === room.id
+            ? {
+                ...currentRoom,
+                housekeeping_status: status,
+              }
+            : currentRoom
+        )
+      );
+
+      setMessage(
+        `Room ${room.room_number} marked ${formatHousekeepingStatus(
+          status
+        )}.`
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not update housekeeping status."
+      );
+    } finally {
+      setUpdatingRoomId("");
+    }
+  }
+
+  // =========================================================
+  // OUT OF SERVICE
+  // =========================================================
+
+  async function toggleOutOfService(room: Room) {
+    const currentlyActive =
+      room.operational_status === "active";
+
+    const newStatus = currentlyActive
+      ? "out_of_service"
+      : "active";
+
+    const question = currentlyActive
+      ? `Take Room ${room.room_number} OUT OF SERVICE?\n\nThe room should not be used for new reservations until it is returned to service.`
+      : `Return Room ${room.room_number} to service?`;
+
+    const confirmed = window.confirm(question);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setUpdatingRoomId(room.id);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const { error } = await supabase
+        .from("rooms")
+        .update({
+          operational_status: newStatus,
+        })
+        .eq("id", room.id);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setRooms((currentRooms) =>
+        currentRooms.map((currentRoom) =>
+          currentRoom.id === room.id
+            ? {
+                ...currentRoom,
+                operational_status: newStatus,
+              }
+            : currentRoom
+        )
+      );
+
+      if (newStatus === "out_of_service") {
+        setMessage(
+          `Room ${room.room_number} taken out of service.`
+        );
+      } else {
+        setMessage(
+          `Room ${room.room_number} returned to service.`
+        );
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not update room."
+      );
+    } finally {
+      setUpdatingRoomId("");
+    }
+  }
+
+  // =========================================================
+  // COUNTERS
+  // =========================================================
+
+  const cleanCount = useMemo(() => {
+    return rooms.filter(
+      (room) =>
+        room.operational_status === "active" &&
+        normaliseHousekeepingStatus(room.housekeeping_status) ===
+          "clean"
+    ).length;
+  }, [rooms]);
+
+  const dirtyCount = useMemo(() => {
+    return rooms.filter(
+      (room) =>
+        room.operational_status === "active" &&
+        normaliseHousekeepingStatus(room.housekeeping_status) ===
+          "dirty"
+    ).length;
+  }, [rooms]);
+
+  const cleaningCount = useMemo(() => {
+    return rooms.filter(
+      (room) =>
+        room.operational_status === "active" &&
+        normaliseHousekeepingStatus(room.housekeeping_status) ===
+          "cleaning"
+    ).length;
+  }, [rooms]);
+
+  const outOfServiceCount = useMemo(() => {
+    return rooms.filter(
+      (room) => room.operational_status !== "active"
+    ).length;
+  }, [rooms]);
+
+  // =========================================================
+  // LOADING
+  // =========================================================
+
+  if (loading) {
+    return (
+      <main style={pageStyle}>
+        <div style={loadingBox}>Loading housekeeping...</div>
+      </main>
+    );
+  }
+
+  // =========================================================
+  // PAGE
+  // =========================================================
+
+  return (
+    <main style={pageStyle}>
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
+
+      <header style={headerStyle}>
+        <div>
+          <button
+            type="button"
+            onClick={() => router.push("/reservations")}
+            style={backButton}
+          >
+            ← Reservation Calendar
+          </button>
+
+          <div style={eyebrow}>NETPOS HOSPITALITY</div>
+
+          <h1 style={titleStyle}>Housekeeping</h1>
+
+          <div style={subtitleStyle}>
+            Simple room cleaning status.
+          </div>
+        </div>
+
+        <div style={propertyArea}>
+          <label style={fieldLabel}>PROPERTY</label>
+
+          <select
+            value={propertyId}
+            onChange={(event) =>
+              changeProperty(event.target.value)
+            }
+            style={propertySelect}
+          >
+            {properties.length === 0 && (
+              <option value="">No properties</option>
+            )}
+
+            {properties.map((property) => (
+              <option
+                key={property.id}
+                value={property.id}
+              >
+                {property.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </header>
+
+      {/* =====================================================
+          SUMMARY
+      ===================================================== */}
+
+      <section style={summaryGrid}>
+        <SummaryCard
+          label="Clean"
+          value={cleanCount}
+          type="clean"
+        />
+
+        <SummaryCard
+          label="Dirty"
+          value={dirtyCount}
+          type="dirty"
+        />
+
+        <SummaryCard
+          label="Cleaning"
+          value={cleaningCount}
+          type="cleaning"
+        />
+
+        <SummaryCard
+          label="Out of Service"
+          value={outOfServiceCount}
+          type="out"
+        />
+      </section>
+
+      {/* =====================================================
+          MESSAGES
+      ===================================================== */}
+
+      {message && (
+        <div style={successBox}>✓ {message}</div>
+      )}
+
+      {errorMessage && (
+        <div style={errorBox}>{errorMessage}</div>
+      )}
+
+      {/* =====================================================
+          ROOMS
+      ===================================================== */}
+
+      {loadingRooms ? (
+        <div style={emptyBox}>Loading rooms...</div>
+      ) : rooms.length === 0 ? (
+        <div style={emptyBox}>
+          No rooms found for this property.
+        </div>
+      ) : (
+        <section style={roomsGrid}>
+          {rooms.map((room) => {
+            const housekeepingStatus =
+              normaliseHousekeepingStatus(
+                room.housekeeping_status
+              );
+
+            const outOfService =
+              room.operational_status !== "active";
+
+            const updating =
+              updatingRoomId === room.id;
+
+            return (
+              <article
+                key={room.id}
+                style={{
+                  ...roomCard,
+                  ...getRoomCardStyle(
+                    housekeepingStatus,
+                    outOfService
+                  ),
+                  opacity: updating ? 0.65 : 1,
+                }}
+              >
+                {/* ROOM TOP */}
+
+                <div style={roomTop}>
+                  <div>
+                    <span style={roomLabel}>ROOM</span>
+
+                    <strong style={roomNumber}>
+                      {room.room_number}
+                    </strong>
+
+                    {room.room_name && (
+                      <div style={roomName}>
+                        {room.room_name}
+                      </div>
+                    )}
+                  </div>
+
+                  <HousekeepingBadge
+                    status={housekeepingStatus}
+                    outOfService={outOfService}
+                  />
+                </div>
+
+                {/* CURRENT STATUS */}
+
+                <div style={currentStatusArea}>
+                  <span style={currentStatusLabel}>
+                    CURRENT STATUS
+                  </span>
+
+                  <strong style={currentStatusValue}>
+                    {outOfService
+                      ? "Out of Service"
+                      : formatHousekeepingStatus(
+                          housekeepingStatus
+                        )}
+                  </strong>
+                </div>
+
+                {/* NORMAL HOUSEKEEPING BUTTONS */}
+
+                {!outOfService && (
+                  <div style={housekeepingButtons}>
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() =>
+                        changeHousekeepingStatus(
+                          room,
+                          "dirty"
+                        )
+                      }
+                      style={{
+                        ...housekeepingButton,
+                        ...(housekeepingStatus === "dirty"
+                          ? activeDirtyButton
+                          : {}),
+                      }}
+                    >
+                      Dirty
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() =>
+                        changeHousekeepingStatus(
+                          room,
+                          "cleaning"
+                        )
+                      }
+                      style={{
+                        ...housekeepingButton,
+                        ...(housekeepingStatus ===
+                        "cleaning"
+                          ? activeCleaningButton
+                          : {}),
+                      }}
+                    >
+                      Cleaning
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() =>
+                        changeHousekeepingStatus(
+                          room,
+                          "clean"
+                        )
+                      }
+                      style={{
+                        ...housekeepingButton,
+                        ...(housekeepingStatus === "clean"
+                          ? activeCleanButton
+                          : {}),
+                      }}
+                    >
+                      ✓ Clean
+                    </button>
+                  </div>
+                )}
+
+                {/* OUT OF SERVICE */}
+
+                <button
+                  type="button"
+                  disabled={updating}
+                  onClick={() =>
+                    toggleOutOfService(room)
+                  }
+                  style={
+                    outOfService
+                      ? returnServiceButton
+                      : outOfServiceButton
+                  }
+                >
+                  {updating
+                    ? "Updating..."
+                    : outOfService
+                    ? "Return to Service"
+                    : "Out of Service"}
+                </button>
+              </article>
+            );
+          })}
+        </section>
+      )}
+
+      {/* =====================================================
+          FOOTER
+      ===================================================== */}
+
+      <footer style={footerStyle}>
+        <div style={footerHint}>
+          Normal workflow:
+          <strong> Dirty → Cleaning → Clean</strong>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            router.push("/reservations");
+            router.refresh();
+          }}
+          style={finishButton}
+        >
+          ✓ Finish
+        </button>
+      </footer>
+    </main>
+  );
+}
+
+// =========================================================
+// SUMMARY CARD
+// =========================================================
+
+function SummaryCard({
+  label,
+  value,
+  type,
+}: {
+  label: string;
+  value: number;
+  type: "clean" | "dirty" | "cleaning" | "out";
+}) {
+  const styles = {
+    clean: {
+      background: "#edf8f0",
+      borderColor: "#afd0b7",
+      color: "#176332",
+    },
+
+    dirty: {
+      background: "#fff0f0",
+      borderColor: "#e2b0b0",
+      color: "#982727",
+    },
+
+    cleaning: {
+      background: "#fff9e6",
+      borderColor: "#e5d18c",
+      color: "#705900",
+    },
+
+    out: {
+      background: "#f2f2f2",
+      borderColor: "#cccccc",
+      color: "#555555",
+    },
+  };
+
+  const selectedStyle = styles[type];
+
+  return (
+    <div
+      style={{
+        ...summaryCard,
+        ...selectedStyle,
+      }}
+    >
+      <div>
+        <span style={summarySmallLabel}>
+          {label.toUpperCase()}
+        </span>
+
+        <div style={summaryDescription}>
+          {type === "clean" && "Ready"}
+          {type === "dirty" && "Needs cleaning"}
+          {type === "cleaning" && "In progress"}
+          {type === "out" && "Unavailable"}
+        </div>
+      </div>
+
+      <strong style={summaryNumber}>{value}</strong>
+    </div>
+  );
+}
+
+// =========================================================
+// HOUSEKEEPING BADGE
+// =========================================================
+
+function HousekeepingBadge({
+  status,
+  outOfService,
+}: {
+  status: string;
+  outOfService: boolean;
+}) {
+  if (outOfService) {
+    return (
+      <span style={outBadge}>OUT OF SERVICE</span>
+    );
+  }
+
+  if (status === "dirty") {
+    return <span style={dirtyBadge}>DIRTY</span>;
+  }
+
+  if (status === "cleaning") {
+    return (
+      <span style={cleaningBadge}>CLEANING</span>
+    );
+  }
+
+  return <span style={cleanBadge}>CLEAN</span>;
+}
+
+// =========================================================
+// HELPERS
+// =========================================================
+
+function normaliseHousekeepingStatus(
+  value: string | null | undefined
+) {
+  const cleaned = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (cleaned === "dirty") {
+    return "dirty";
+  }
+
+  if (cleaned === "cleaning") {
+    return "cleaning";
+  }
+
+  return "clean";
+}
+
+function formatHousekeepingStatus(value: string) {
+  if (value === "dirty") {
+    return "Dirty";
+  }
+
+  if (value === "cleaning") {
+    return "Cleaning";
+  }
+
+  return "Clean";
+}
+
+function getRoomCardStyle(
+  housekeepingStatus: string,
+  outOfService: boolean
+): React.CSSProperties {
+  if (outOfService) {
+    return {
+      borderColor: "#c7c7c7",
+      background: "#f8f8f8",
+    };
+  }
+
+  if (housekeepingStatus === "dirty") {
+    return {
+      borderColor: "#dfaaaa",
+      background: "#fffafa",
+    };
+  }
+
+  if (housekeepingStatus === "cleaning") {
+    return {
+      borderColor: "#dfca7e",
+      background: "#fffdf6",
+    };
+  }
+
+  return {
+    borderColor: "#a9ceb2",
+    background: "#fbfffc",
+  };
+}
+
+// =========================================================
+// STYLES
+// =========================================================
+
+const pageStyle: React.CSSProperties = {
+  maxWidth: 1280,
+  margin: "0 auto",
+  padding: "14px 20px 18px",
+  fontFamily: "Arial, sans-serif",
+  boxSizing: "border-box",
+};
+
+const loadingBox: React.CSSProperties = {
+  padding: 30,
+  textAlign: "center",
+  color: "#666",
+  fontSize: 11,
+};
+
+const headerStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 20,
+  marginBottom: 11,
+};
+
+const backButton: React.CSSProperties = {
+  border: 0,
+  background: "transparent",
+  padding: 0,
+  color: "#111",
+  fontSize: 9,
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const eyebrow: React.CSSProperties = {
+  marginTop: 7,
+  marginBottom: 2,
+  color: "#6c7a89",
+  fontSize: 7,
+  fontWeight: 900,
+  letterSpacing: 1,
+};
+
+const titleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 25,
+  lineHeight: 1.1,
+};
+
+const subtitleStyle: React.CSSProperties = {
+  marginTop: 3,
+  color: "#777",
+  fontSize: 9,
+};
+
+const propertyArea: React.CSSProperties = {
+  width: 240,
+};
+
+const fieldLabel: React.CSSProperties = {
+  display: "block",
+  marginBottom: 4,
+  color: "#777",
+  fontSize: 7,
+  fontWeight: 900,
+  letterSpacing: 0.5,
+};
+
+const propertySelect: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "9px 10px",
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: "#ccc",
+  borderRadius: 7,
+  background: "#fff",
+  fontSize: 10,
+  fontWeight: 700,
+};
+
+const summaryGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4,1fr)",
+  gap: 8,
+  marginBottom: 10,
+};
+
+const summaryCard: React.CSSProperties = {
+  minHeight: 58,
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 10,
+  padding: "8px 12px",
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderRadius: 8,
+};
+
+const summarySmallLabel: React.CSSProperties = {
+  display: "block",
+  marginBottom: 2,
+  fontSize: 8,
+  fontWeight: 900,
+  letterSpacing: 0.4,
+};
+
+const summaryDescription: React.CSSProperties = {
+  fontSize: 8,
+  opacity: 0.75,
+};
+
+const summaryNumber: React.CSSProperties = {
+  fontSize: 23,
+  lineHeight: 1,
+};
+
+const successBox: React.CSSProperties = {
+  marginBottom: 9,
+  padding: "7px 10px",
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: "#afd0b7",
+  borderRadius: 7,
+  background: "#edf8f0",
+  color: "#176332",
+  fontSize: 9,
+  fontWeight: 700,
+};
+
+const errorBox: React.CSSProperties = {
+  marginBottom: 9,
+  padding: "7px 10px",
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: "#e0aaaa",
+  borderRadius: 7,
+  background: "#fff0f0",
+  color: "#a11a1a",
+  fontSize: 9,
+  fontWeight: 700,
+};
+
+const emptyBox: React.CSSProperties = {
+  padding: 30,
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: "#ddd",
+  borderRadius: 8,
+  textAlign: "center",
+  color: "#777",
+  fontSize: 10,
+};
+
+const roomsGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns:
+    "repeat(auto-fit,minmax(245px,1fr))",
+  gap: 9,
+};
+
+const roomCard: React.CSSProperties = {
+  padding: 11,
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderRadius: 9,
+  transition: "opacity .15s ease",
+};
+
+const roomTop: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: 10,
+};
+
+const roomLabel: React.CSSProperties = {
+  display: "block",
+  marginBottom: 2,
+  color: "#777",
+  fontSize: 7,
+  fontWeight: 900,
+  letterSpacing: 0.5,
+};
+
+const roomNumber: React.CSSProperties = {
+  display: "block",
+  color: "#17212b",
+  fontSize: 25,
+  lineHeight: 1,
+};
+
+const roomName: React.CSSProperties = {
+  marginTop: 3,
+  color: "#777",
+  fontSize: 8,
+};
+
+const currentStatusArea: React.CSSProperties = {
+  marginTop: 10,
+  marginBottom: 8,
+  padding: "6px 8px",
+  borderRadius: 6,
+  background: "rgba(255,255,255,.75)",
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: "#e7e7e7",
+};
+
+const currentStatusLabel: React.CSSProperties = {
+  display: "block",
+  marginBottom: 2,
+  color: "#888",
+  fontSize: 6,
+  fontWeight: 900,
+  letterSpacing: 0.5,
+};
+
+const currentStatusValue: React.CSSProperties = {
+  display: "block",
+  fontSize: 11,
+};
+
+const housekeepingButtons: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3,1fr)",
+  gap: 5,
+};
+
+const housekeepingButton: React.CSSProperties = {
+  minHeight: 34,
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: "#ccc",
+  borderRadius: 6,
+  background: "#fff",
+  color: "#444",
+  padding: "7px 4px",
+  fontSize: 9,
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const activeDirtyButton: React.CSSProperties = {
+  borderColor: "#cf8585",
+  background: "#ffecec",
+  color: "#972323",
+};
+
+const activeCleaningButton: React.CSSProperties = {
+  borderColor: "#cdb550",
+  background: "#fff5cb",
+  color: "#665000",
+};
+
+const activeCleanButton: React.CSSProperties = {
+  borderColor: "#78ad84",
+  background: "#e5f5e9",
+  color: "#176332",
+};
+
+const outOfServiceButton: React.CSSProperties = {
+  width: "100%",
+  marginTop: 6,
+  borderWidth: 0,
+  borderRadius: 6,
+  background: "#ededed",
+  color: "#666",
+  padding: "7px",
+  fontSize: 8,
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const returnServiceButton: React.CSSProperties = {
+  width: "100%",
+  marginTop: 6,
+  borderWidth: 0,
+  borderRadius: 6,
+  background: "#111",
+  color: "#fff",
+  padding: "9px",
+  fontSize: 9,
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const badgeBase: React.CSSProperties = {
+  padding: "4px 7px",
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderRadius: 20,
+  fontSize: 7,
+  fontWeight: 900,
+  whiteSpace: "nowrap",
+};
+
+const cleanBadge: React.CSSProperties = {
+  ...badgeBase,
+  borderColor: "#9ac5a4",
+  background: "#eaf7ed",
+  color: "#176332",
+};
+
+const dirtyBadge: React.CSSProperties = {
+  ...badgeBase,
+  borderColor: "#dfa4a4",
+  background: "#ffeded",
+  color: "#992626",
+};
+
+const cleaningBadge: React.CSSProperties = {
+  ...badgeBase,
+  borderColor: "#d8c36d",
+  background: "#fff7d9",
+  color: "#6c5600",
+};
+
+const outBadge: React.CSSProperties = {
+  ...badgeBase,
+  borderColor: "#c5c5c5",
+  background: "#ededed",
+  color: "#555",
+};
+
+const footerStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 15,
+  marginTop: 12,
+  paddingTop: 9,
+  borderTopWidth: 1,
+  borderTopStyle: "solid",
+  borderTopColor: "#e5e5e5",
+};
+
+const footerHint: React.CSSProperties = {
+  color: "#777",
+  fontSize: 8,
+};
+
+const finishButton: React.CSSProperties = {
+  minWidth: 110,
+  borderWidth: 0,
+  borderRadius: 6,
+  background: "#176332",
+  color: "#fff",
+  padding: "9px 14px",
+  fontSize: 9,
+  fontWeight: 900,
+  cursor: "pointer",
+};
