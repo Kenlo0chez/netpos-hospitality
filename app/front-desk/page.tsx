@@ -1091,7 +1091,7 @@ export default function FrontDeskPage() {
 
       {message && (
         <div style={successBox}>
-          âœ“ {message}
+         {message}
         </div>
       )}
 
@@ -1415,7 +1415,7 @@ export default function FrontDeskPage() {
                       housekeepingClearIcon
                     }
                   >
-                    âœ“
+                    
                   </div>
 
                   <div>
@@ -1531,7 +1531,7 @@ export default function FrontDeskPage() {
           />
 
           <span style={workflowArrow}>
-            â†’
+            to
           </span>
 
           <WorkflowStep
@@ -1540,7 +1540,7 @@ export default function FrontDeskPage() {
           />
 
           <span style={workflowArrow}>
-            â†’
+            to
           </span>
 
           <WorkflowStep
@@ -1549,7 +1549,7 @@ export default function FrontDeskPage() {
           />
 
           <span style={workflowArrow}>
-            â†’
+            to
           </span>
 
           <WorkflowStep
@@ -1558,7 +1558,7 @@ export default function FrontDeskPage() {
           />
 
           <span style={workflowArrow}>
-            â†’
+            to
           </span>
 
           <WorkflowStep
@@ -1997,7 +1997,7 @@ function GuestRow({
             label="Stay"
             value={`${formatShortDate(
               reservation.arrival_date
-            )} â†’ ${formatShortDate(
+            )} to ${formatShortDate(
               reservation.departure_date
             )}`}
           />
@@ -2014,7 +2014,7 @@ function GuestRow({
             }${
               reservation.children >
               0
-                ? ` Â· ${reservation.children} Child${
+                ? ` - ${reservation.children} Child${
                     reservation.children ===
                     1
                       ? ""
@@ -2431,7 +2431,7 @@ function EmptyRow({
   return (
     <div style={emptyRow}>
       <div style={emptyIcon}>
-        âœ“
+        
       </div>
 
       <span>
