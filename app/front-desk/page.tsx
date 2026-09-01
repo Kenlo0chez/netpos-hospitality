@@ -49,6 +49,7 @@ type ReservationRoom = {
 type Reservation = {
   id: string;
   property_id: string;
+  property_name?: string;
   reservation_number: string;
   status: string;
   booking_source: string | null;
@@ -72,14 +73,17 @@ type Reservation = {
 
 type Payment = {
   id: string;
+  property_id: string;
   reservation_id: string | null;
   transaction_type: string;
   amount: number;
+  received_at: string | null;
 };
 
 type Room = {
   id: string;
   property_id: string;
+  property_name?: string;
   room_number: string;
   room_name: string | null;
   housekeeping_status: string | null;
@@ -107,6 +111,7 @@ export default function FrontDeskPage() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const today = getTodayString();
+  const ALL_PROPERTIES_ID = "__all_properties__";
 
   useEffect(() => {
     initialisePage();
@@ -130,15 +135,20 @@ export default function FrontDeskPage() {
 
       setProperties(propertyRows);
 
-      const firstPropertyId =
-        propertyRows.length > 0
+      const initialPropertyId =
+        propertyRows.length > 1
+          ? ALL_PROPERTIES_ID
+          : propertyRows.length === 1
           ? propertyRows[0].id
           : "";
 
-      setPropertyId(firstPropertyId);
+      setPropertyId(initialPropertyId);
 
-      if (firstPropertyId) {
-        await loadFrontDesk(firstPropertyId);
+      if (initialPropertyId) {
+        await loadFrontDesk(
+          initialPropertyId,
+          propertyRows
+        );
       }
     } catch (error) {
       setErrorMessage(
@@ -152,7 +162,8 @@ export default function FrontDeskPage() {
   }
 
   async function loadFrontDesk(
-    selectedPropertyId: string
+    selectedPropertyId: string,
+    propertyRowsForNames: Property[] = properties
   ) {
     if (!selectedPropertyId) {
       setReservations([]);
@@ -165,89 +176,103 @@ export default function FrontDeskPage() {
     setErrorMessage("");
 
     try {
+      let reservationQuery = supabase
+        .from("reservations")
+        .select(`
+          id,
+          property_id,
+          reservation_number,
+          status,
+          booking_source,
+          arrival_date,
+          departure_date,
+          adults,
+          children,
+          total_amount,
+          deposit_required,
+          checked_in_at,
+          checked_out_at,
+          guests (
+            first_name,
+            last_name,
+            phone
+          ),
+          reservation_rooms (
+            id,
+            room_id,
+            room_type_id,
+            arrival_date,
+            departure_date,
+            nightly_rate,
+            rooms (
+              room_number,
+              room_name,
+              housekeeping_status,
+              operational_status
+            ),
+            room_types (
+              name
+            )
+          )
+        `)
+        .order("arrival_date", {
+          ascending: true,
+        });
+
+      let paymentQuery = supabase
+        .from("payments")
+        .select(`
+          id,
+          property_id,
+          reservation_id,
+          transaction_type,
+          amount,
+          received_at
+        `);
+
+      let roomQuery = supabase
+        .from("rooms")
+        .select(`
+          id,
+          property_id,
+          room_number,
+          room_name,
+          housekeeping_status,
+          operational_status
+        `)
+        .order("room_number");
+
+      if (
+        selectedPropertyId !==
+        ALL_PROPERTIES_ID
+      ) {
+        reservationQuery =
+          reservationQuery.eq(
+            "property_id",
+            selectedPropertyId
+          );
+
+        paymentQuery =
+          paymentQuery.eq(
+            "property_id",
+            selectedPropertyId
+          );
+
+        roomQuery =
+          roomQuery.eq(
+            "property_id",
+            selectedPropertyId
+          );
+      }
+
       const [
         reservationResult,
         paymentResult,
         roomResult,
       ] = await Promise.all([
-        supabase
-          .from("reservations")
-          .select(`
-            id,
-            property_id,
-            reservation_number,
-            status,
-            booking_source,
-            arrival_date,
-            departure_date,
-            adults,
-            children,
-            total_amount,
-            deposit_required,
-            checked_in_at,
-            checked_out_at,
-            guests (
-              first_name,
-              last_name,
-              phone
-            ),
-            reservation_rooms (
-              id,
-              room_id,
-              room_type_id,
-              arrival_date,
-              departure_date,
-              nightly_rate,
-              rooms (
-                room_number,
-                room_name,
-                housekeeping_status,
-                operational_status
-              ),
-              room_types (
-                name
-              )
-            )
-          `)
-          .eq(
-            "property_id",
-            selectedPropertyId
-          )
-          .order(
-            "arrival_date",
-            {
-              ascending: true,
-            }
-          ),
-
-        supabase
-          .from("payments")
-          .select(`
-            id,
-            reservation_id,
-            transaction_type,
-            amount
-          `)
-          .eq(
-            "property_id",
-            selectedPropertyId
-          ),
-
-        supabase
-          .from("rooms")
-          .select(`
-            id,
-            property_id,
-            room_number,
-            room_name,
-            housekeeping_status,
-            operational_status
-          `)
-          .eq(
-            "property_id",
-            selectedPropertyId
-          )
-          .order("room_number"),
+        reservationQuery,
+        paymentQuery,
+        roomQuery,
       ]);
 
       if (reservationResult.error) {
@@ -268,9 +293,46 @@ export default function FrontDeskPage() {
         );
       }
 
+      const propertyNameById =
+        new Map(
+          propertyRowsForNames.map(
+            (property) => [
+              property.id,
+              property.name,
+            ]
+          )
+        );
+
+      const reservationRows =
+        ((reservationResult.data as unknown as Reservation[]) ??
+          []).map(
+          (reservation) => ({
+            ...reservation,
+            property_name:
+              selectedPropertyId ===
+              ALL_PROPERTIES_ID
+                ? propertyNameById.get(
+                    reservation.property_id
+                  ) ?? "Property"
+                : undefined,
+          })
+        );
+
+      const roomRows =
+        ((roomResult.data as Room[]) ??
+          []).map((room) => ({
+          ...room,
+          property_name:
+            selectedPropertyId ===
+            ALL_PROPERTIES_ID
+              ? propertyNameById.get(
+                  room.property_id
+                ) ?? "Property"
+              : undefined,
+        }));
+
       setReservations(
-        (reservationResult.data as unknown as Reservation[]) ??
-          []
+        reservationRows
       );
 
       setPayments(
@@ -279,8 +341,7 @@ export default function FrontDeskPage() {
       );
 
       setRooms(
-        (roomResult.data as Room[]) ??
-          []
+        roomRows
       );
     } catch (error) {
       setErrorMessage(
@@ -511,6 +572,222 @@ export default function FrontDeskPage() {
       0
     );
 
+  const revenueToday =
+    payments
+      .filter(
+        (payment) =>
+          getLocalDateStringFromTimestamp(
+            payment.received_at
+          ) === today
+      )
+      .reduce(
+        (total, payment) => {
+          const amount =
+            Number(
+              payment.amount ?? 0
+            );
+
+          return payment.transaction_type ===
+            "refund"
+            ? total - amount
+            : total + amount;
+        },
+        0
+      );
+
+  const propertyPerformance =
+    useMemo(() => {
+      return properties.map(
+        (property) => {
+          const propertyReservations =
+            reservations.filter(
+              (reservation) =>
+                reservation.property_id ===
+                property.id
+            );
+
+          const propertyRooms =
+            rooms.filter(
+              (room) =>
+                room.property_id ===
+                  property.id &&
+                room.operational_status ===
+                  "active"
+            );
+
+          const occupiedIds =
+            new Set<string>();
+
+          for (
+            const reservation of
+              propertyReservations
+          ) {
+            if (
+              ![
+                "provisional",
+                "confirmed",
+                "checked_in",
+              ].includes(
+                reservation.status
+              )
+            ) {
+              continue;
+            }
+
+            for (
+              const item of
+                reservation.reservation_rooms
+            ) {
+              if (!item.room_id) {
+                continue;
+              }
+
+              const arrival =
+                item.arrival_date ||
+                reservation.arrival_date;
+
+              const departure =
+                item.departure_date ||
+                reservation.departure_date;
+
+              if (
+                today >= arrival &&
+                today < departure
+              ) {
+                occupiedIds.add(
+                  item.room_id
+                );
+              }
+            }
+          }
+
+          const arrivals =
+            propertyReservations.filter(
+              (reservation) =>
+                reservation.arrival_date ===
+                  today &&
+                [
+                  "provisional",
+                  "confirmed",
+                ].includes(
+                  reservation.status
+                )
+            ).length;
+
+          const departures =
+            propertyReservations.filter(
+              (reservation) =>
+                reservation.departure_date ===
+                  today &&
+                reservation.status ===
+                  "checked_in"
+            ).length;
+
+          const inHouseCount =
+            propertyReservations.filter(
+              (reservation) =>
+                reservation.status ===
+                "checked_in"
+            ).length;
+
+          const dirtyCount =
+            propertyRooms.filter(
+              (room) =>
+                normaliseHousekeeping(
+                  room.housekeeping_status
+                ) === "dirty"
+            ).length;
+
+          const availableCount =
+            Math.max(
+              0,
+              propertyRooms.length -
+                occupiedIds.size
+            );
+
+          const outstanding =
+            propertyReservations
+              .filter((reservation) =>
+                [
+                  "confirmed",
+                  "checked_in",
+                  "checked_out",
+                ].includes(
+                  reservation.status
+                )
+              )
+              .reduce(
+                (total, reservation) =>
+                  total +
+                  balanceForReservation(
+                    reservation
+                  ),
+                0
+              );
+
+          const revenue =
+            payments
+              .filter(
+                (payment) =>
+                  payment.property_id ===
+                    property.id &&
+                  getLocalDateStringFromTimestamp(
+                    payment.received_at
+                  ) === today
+              )
+              .reduce(
+                (total, payment) => {
+                  const amount =
+                    Number(
+                      payment.amount ?? 0
+                    );
+
+                  return payment.transaction_type ===
+                    "refund"
+                    ? total - amount
+                    : total + amount;
+                },
+                0
+              );
+
+          const occupancy =
+            propertyRooms.length > 0
+              ? Math.round(
+                  (occupiedIds.size /
+                    propertyRooms.length) *
+                    100
+                )
+              : 0;
+
+          return {
+            id: property.id,
+            name: property.name,
+            rooms:
+              propertyRooms.length,
+            occupied:
+              occupiedIds.size,
+            occupancy,
+            arrivals,
+            departures,
+            inHouse:
+              inHouseCount,
+            available:
+              availableCount,
+            dirty:
+              dirtyCount,
+            revenue,
+            outstanding,
+          };
+        }
+      );
+    }, [
+      properties,
+      reservations,
+      rooms,
+      payments,
+      today,
+    ]);
+
   // =========================================================
   // CHECK IN
   // =========================================================
@@ -739,6 +1016,10 @@ export default function FrontDeskPage() {
 
           <div style={subtitleStyle}>
             {formatFriendlyDate(today)}
+            {propertyId ===
+              ALL_PROPERTIES_ID
+              ? " · Central Control"
+              : ""}
           </div>
         </div>
 
@@ -757,6 +1038,14 @@ export default function FrontDeskPage() {
               }
               style={propertySelect}
             >
+              {properties.length > 1 && (
+                <option
+                  value={ALL_PROPERTIES_ID}
+                >
+                  All Properties
+                </option>
+              )}
+
               {properties.map(
                 (property) => (
                   <option
@@ -802,7 +1091,7 @@ export default function FrontDeskPage() {
 
       {message && (
         <div style={successBox}>
-          ✓ {message}
+          âœ“ {message}
         </div>
       )}
 
@@ -871,7 +1160,28 @@ export default function FrontDeskPage() {
           }
           description="Guest balances"
         />
+
+        <SummaryMoneyCard
+          label="Revenue Today"
+          value={
+            revenueToday
+          }
+          description="Payments received"
+        />
       </section>
+
+      {propertyId ===
+        ALL_PROPERTIES_ID &&
+        properties.length > 1 && (
+          <PropertyPerformanceTable
+            rows={
+              propertyPerformance
+            }
+            onOpenProperty={(id) =>
+              changeProperty(id)
+            }
+          />
+        )}
 
       {loading ? (
         <section style={loadingBox}>
@@ -1105,7 +1415,7 @@ export default function FrontDeskPage() {
                       housekeepingClearIcon
                     }
                   >
-                    ✓
+                    âœ“
                   </div>
 
                   <div>
@@ -1221,7 +1531,7 @@ export default function FrontDeskPage() {
           />
 
           <span style={workflowArrow}>
-            →
+            â†’
           </span>
 
           <WorkflowStep
@@ -1230,7 +1540,7 @@ export default function FrontDeskPage() {
           />
 
           <span style={workflowArrow}>
-            →
+            â†’
           </span>
 
           <WorkflowStep
@@ -1239,7 +1549,7 @@ export default function FrontDeskPage() {
           />
 
           <span style={workflowArrow}>
-            →
+            â†’
           </span>
 
           <WorkflowStep
@@ -1248,7 +1558,7 @@ export default function FrontDeskPage() {
           />
 
           <span style={workflowArrow}>
-            →
+            â†’
           </span>
 
           <WorkflowStep
@@ -1296,6 +1606,226 @@ export default function FrontDeskPage() {
         </div>
       </footer>
     </main>
+  );
+}
+
+// =========================================================
+// CENTRAL PROPERTY PERFORMANCE
+// =========================================================
+
+function PropertyPerformanceTable({
+  rows,
+  onOpenProperty,
+}: {
+  rows: {
+    id: string;
+    name: string;
+    rooms: number;
+    occupied: number;
+    occupancy: number;
+    arrivals: number;
+    departures: number;
+    inHouse: number;
+    available: number;
+    dirty: number;
+    revenue: number;
+    outstanding: number;
+  }[];
+  onOpenProperty: (
+    id: string
+  ) => void;
+}) {
+  return (
+    <section
+      style={
+        propertyPerformancePanel
+      }
+    >
+      <div
+        style={
+          propertyPerformanceHeader
+        }
+      >
+        <div>
+          <strong
+            style={
+              propertyPerformanceTitle
+            }
+          >
+            Property Performance
+          </strong>
+
+          <div
+            style={
+              propertyPerformanceSubtitle
+            }
+          >
+            Central overview across all guest houses
+          </div>
+        </div>
+
+        <span
+          style={
+            propertyPerformanceHint
+          }
+        >
+          Select a row to open that property
+        </span>
+      </div>
+
+      <div
+        style={
+          propertyPerformanceTableWrap
+        }
+      >
+        <table
+          style={
+            propertyPerformanceTable
+          }
+        >
+          <thead>
+            <tr>
+              <th
+                style={
+                  propertyPerformanceThLeft
+                }
+              >
+                Property
+              </th>
+              <th style={propertyPerformanceTh}>
+                Occupancy
+              </th>
+              <th style={propertyPerformanceTh}>
+                Arrivals
+              </th>
+              <th style={propertyPerformanceTh}>
+                In House
+              </th>
+              <th style={propertyPerformanceTh}>
+                Departures
+              </th>
+              <th style={propertyPerformanceTh}>
+                Available
+              </th>
+              <th style={propertyPerformanceTh}>
+                Dirty
+              </th>
+              <th style={propertyPerformanceTh}>
+                Revenue Today
+              </th>
+              <th style={propertyPerformanceTh}>
+                Outstanding
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {rows.map(
+              (row) => (
+                <tr
+                  key={row.id}
+                  onClick={() =>
+                    onOpenProperty(
+                      row.id
+                    )
+                  }
+                  style={
+                    propertyPerformanceRow
+                  }
+                >
+                  <td
+                    style={
+                      propertyPerformanceName
+                    }
+                  >
+                    <strong>
+                      {row.name}
+                    </strong>
+
+                    <span>
+                      {row.occupied}/
+                      {row.rooms} rooms occupied
+                    </span>
+                  </td>
+
+                  <td
+                    style={
+                      propertyPerformanceTd
+                    }
+                  >
+                    <strong>
+                      {row.occupancy}%
+                    </strong>
+                  </td>
+
+                  <td
+                    style={
+                      propertyPerformanceTd
+                    }
+                  >
+                    {row.arrivals}
+                  </td>
+
+                  <td
+                    style={
+                      propertyPerformanceTd
+                    }
+                  >
+                    {row.inHouse}
+                  </td>
+
+                  <td
+                    style={
+                      propertyPerformanceTd
+                    }
+                  >
+                    {row.departures}
+                  </td>
+
+                  <td
+                    style={
+                      propertyPerformanceTd
+                    }
+                  >
+                    {row.available}
+                  </td>
+
+                  <td
+                    style={
+                      propertyPerformanceTd
+                    }
+                  >
+                    {row.dirty}
+                  </td>
+
+                  <td
+                    style={
+                      propertyPerformanceMoney
+                    }
+                  >
+                    N$
+                    {row.revenue.toFixed(
+                      2
+                    )}
+                  </td>
+
+                  <td
+                    style={
+                      propertyPerformanceMoney
+                    }
+                  >
+                    N$
+                    {row.outstanding.toFixed(
+                      2
+                    )}
+                  </td>
+                </tr>
+              )
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -1433,9 +1963,9 @@ function GuestRow({
               reservationNumber
             }
           >
-            {
-              reservation.reservation_number
-            }
+            {reservation.property_name
+              ? `${reservation.property_name} · ${reservation.reservation_number}`
+              : reservation.reservation_number}
           </span>
         </div>
 
@@ -1454,7 +1984,7 @@ function GuestRow({
             label="Stay"
             value={`${formatShortDate(
               reservation.arrival_date
-            )} → ${formatShortDate(
+            )} â†’ ${formatShortDate(
               reservation.departure_date
             )}`}
           />
@@ -1471,7 +2001,7 @@ function GuestRow({
             }${
               reservation.children >
               0
-                ? ` · ${reservation.children} Child${
+                ? ` Â· ${reservation.children} Child${
                     reservation.children ===
                     1
                       ? ""
@@ -1563,9 +2093,9 @@ function CompactGuestRow({
 
             {" · "}
 
-            {
-              reservation.reservation_number
-            }
+            {reservation.property_name
+              ? `${reservation.property_name} · ${reservation.reservation_number}`
+              : reservation.reservation_number}
           </div>
         </div>
 
@@ -1634,8 +2164,13 @@ function BalanceRow({
         <div
           style={compactSubtext}
         >
-          {room?.rooms
-            ?.room_number
+          {reservation.property_name
+            ? `${reservation.property_name} · ${
+                room?.rooms?.room_number
+                  ? `Room ${room.rooms.room_number}`
+                  : reservation.reservation_number
+              }`
+            : room?.rooms?.room_number
             ? `Room ${room.rooms.room_number}`
             : reservation.reservation_number}
         </div>
@@ -1679,11 +2214,17 @@ function RoomStatus({
           Room {room.room_number}
         </strong>
 
-        {room.room_name && (
+        {(room.room_name ||
+          room.property_name) && (
           <span
             style={roomNameText}
           >
-            {room.room_name}
+            {[
+              room.property_name,
+              room.room_name,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         )}
       </div>
@@ -1877,7 +2418,7 @@ function EmptyRow({
   return (
     <div style={emptyRow}>
       <div style={emptyIcon}>
-        ✓
+        âœ“
       </div>
 
       <span>
@@ -1929,6 +2470,38 @@ function normaliseHousekeeping(
   }
 
   return "clean";
+}
+
+function getLocalDateStringFromTimestamp(
+  value: string | null
+) {
+  if (!value) {
+    return "";
+  }
+
+  const date =
+    new Date(value);
+
+  const year =
+    date.getFullYear();
+
+  const month =
+    String(
+      date.getMonth() + 1
+    ).padStart(
+      2,
+      "0"
+    );
+
+  const day =
+    String(
+      date.getDate()
+    ).padStart(
+      2,
+      "0"
+    );
+
+  return `${year}-${month}-${day}`;
 }
 
 function getTodayString() {
@@ -2142,7 +2715,7 @@ const secondaryTopButton: CSSProperties = {
 
 const summaryGrid: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(6,minmax(0,1fr))",
+  gridTemplateColumns: "repeat(7,minmax(0,1fr))",
   gap: 7,
   marginBottom: 8,
 };
@@ -2206,6 +2779,100 @@ const summaryMoney: CSSProperties = {
   lineHeight: 1,
   color: DARK_BLUE,
   whiteSpace: "nowrap",
+};
+
+const propertyPerformancePanel: CSSProperties = {
+  marginBottom: 9,
+  border: "1px solid #CFE0ED",
+  borderRadius: 10,
+  background: "#FFFFFF",
+  overflow: "hidden",
+  boxShadow: "0 4px 14px rgba(19,67,108,.04)",
+};
+
+const propertyPerformanceHeader: CSSProperties = {
+  minHeight: 38,
+  padding: "7px 11px",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12,
+  borderBottom: "1px solid #E4ECF2",
+  borderLeft: "4px solid #0D5FA8",
+  background:
+    "linear-gradient(90deg,#F4F9FD 0%,#FFFFFF 100%)",
+};
+
+const propertyPerformanceTitle: CSSProperties = {
+  color: DARK_BLUE,
+  fontSize: 12,
+};
+
+const propertyPerformanceSubtitle: CSSProperties = {
+  marginTop: 2,
+  color: MUTED,
+  fontSize: 12,
+};
+
+const propertyPerformanceHint: CSSProperties = {
+  color: BLUE,
+  fontSize: 12,
+  fontWeight: 800,
+};
+
+const propertyPerformanceTableWrap: CSSProperties = {
+  maxHeight: 148,
+  overflowY: "auto",
+  overflowX: "auto",
+};
+
+const propertyPerformanceTable: CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  tableLayout: "fixed",
+};
+
+const propertyPerformanceTh: CSSProperties = {
+  padding: "6px 6px",
+  borderBottom: "1px solid #E8EEF3",
+  background: "#F8FBFD",
+  color: "#60778B",
+  fontSize: 11.5,
+  fontWeight: 900,
+  textAlign: "right",
+  whiteSpace: "nowrap",
+};
+
+const propertyPerformanceThLeft: CSSProperties = {
+  ...propertyPerformanceTh,
+  width: "20%",
+  textAlign: "left",
+};
+
+const propertyPerformanceRow: CSSProperties = {
+  cursor: "pointer",
+  borderBottom: "1px solid #EDF2F6",
+};
+
+const propertyPerformanceName: CSSProperties = {
+  padding: "6px 8px",
+  color: TEXT,
+  fontSize: 13,
+  textAlign: "left",
+};
+
+const propertyPerformanceTd: CSSProperties = {
+  padding: "6px 6px",
+  color: TEXT,
+  fontSize: 13,
+  textAlign: "right",
+  whiteSpace: "nowrap",
+};
+
+const propertyPerformanceMoney: CSSProperties = {
+  ...propertyPerformanceTd,
+  color: DARK_BLUE,
+  fontWeight: 900,
 };
 
 const dashboardGrid: CSSProperties = {
