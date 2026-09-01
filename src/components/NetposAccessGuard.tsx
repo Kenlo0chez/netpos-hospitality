@@ -295,9 +295,9 @@ export default function NetposAccessGuard({
                   <span style={staffMeta}>
                     {roleLabel(staff.role)}
                     {staff.role === "owner"
-                      ? " � All Properties"
+                      ? "  All Properties"
                       : staff.property_id
-                      ? " � Assigned Property"
+                      ? "  Assigned Property"
                       : ""}
                   </span>
                 </div>

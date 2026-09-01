@@ -782,17 +782,17 @@ export default function UsersPermissionsPage() {
       <section style={roleRuleStrip}>
         <div style={roleRuleItem}>
           <strong>OWNER / ADMIN</strong>
-          <span>Full access Â· All properties</span>
+          <span>Full access · All properties</span>
         </div>
 
         <div style={roleRuleItem}>
           <strong>MANAGER</strong>
-          <span>Full access Â· Assigned property only</span>
+          <span>Full access · Assigned property only</span>
         </div>
 
         <div style={roleRuleItem}>
           <strong>RECEPTION</strong>
-          <span>Front desk + payments + End of Day Â· No reports/setup</span>
+          <span>Front desk + payments + End of Day · No reports/setup</span>
         </div>
 
         <div style={roleRuleItem}>
@@ -809,7 +809,7 @@ export default function UsersPermissionsPage() {
 
       {message && (
         <div style={successBox}>
-          âœ“ {message}
+          ✓ {message}
         </div>
       )}
 
@@ -957,7 +957,7 @@ export default function UsersPermissionsPage() {
                     />
 
                     <span style={editText}>
-                      Edit â†’
+                      Edit →
                     </span>
                   </button>
                 )
@@ -1156,7 +1156,7 @@ export default function UsersPermissionsPage() {
                 }
                 style={modalClose}
               >
-                Ã—
+                ×
               </button>
             </div>
 

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -926,7 +926,7 @@ export default function NewReservationPage() {
             }
             style={backToBoardButton}
           >
-            â† Availability Board
+            ← Availability Board
           </button>
 
           <div style={stepCounter}>
@@ -948,7 +948,7 @@ export default function NewReservationPage() {
           {openedFromBoard.current && (
             <div style={calendarPrefillNotice}>
               <strong>
-                âœ“ Selected from Availability Board
+                ✓ Selected from Availability Board
               </strong>
 
               <span>
@@ -1064,7 +1064,7 @@ export default function NewReservationPage() {
 
                 <strong>
                   {formatFriendlyDate(arrivalDate)}
-                  {" â†’ "}
+                  {" → "}
                   {formatFriendlyDate(departureDate)}
                 </strong>
               </div>
@@ -1077,7 +1077,7 @@ export default function NewReservationPage() {
           )}
 
           <WizardButtons
-            nextLabel="Choose Room â†’"
+            nextLabel="Choose Room →"
             onNext={nextStep}
           />
         </section>
@@ -1097,10 +1097,10 @@ export default function NewReservationPage() {
 
           <div style={stayStrip}>
             {formatFriendlyDate(arrivalDate)}
-            <strong>â†’</strong>
+            <strong>→</strong>
             {formatFriendlyDate(departureDate)}
             <strong>
-              Â· {nights}{" "}
+              · {nights}{" "}
               {nights === 1 ? "Night" : "Nights"}
             </strong>
           </div>
@@ -1208,7 +1208,7 @@ export default function NewReservationPage() {
                       >
                         Room {room.room_number}
                         {room.room_name
-                          ? ` Â· ${room.room_name}`
+                          ? ` · ${room.room_name}`
                           : ""}
                       </option>
                     ))}
@@ -1302,7 +1302,7 @@ export default function NewReservationPage() {
               {availability === "available" && (
                 <div style={availableStyle}>
                   <strong>
-                    âœ“ ROOM AVAILABLE
+                    ✓ ROOM AVAILABLE
                   </strong>
 
                   <div style={statusSubtext}>
@@ -1314,7 +1314,7 @@ export default function NewReservationPage() {
               {availability === "unavailable" && (
                 <div style={unavailableStyle}>
                   <strong>
-                    âœ• ROOM UNAVAILABLE
+                    ✕ ROOM UNAVAILABLE
                   </strong>
 
                   <div style={statusSubtext}>
@@ -1367,7 +1367,7 @@ export default function NewReservationPage() {
                 ? "Checking..."
                 : availability === "unavailable"
                 ? "Room Unavailable"
-                : "Guest Details â†’"
+                : "Guest Details →"
             }
             nextDisabled={
               availability === "checking" ||
@@ -1416,7 +1416,7 @@ export default function NewReservationPage() {
                 >
                   {guest.first_name} {guest.last_name}
                   {guest.phone
-                    ? ` Â· ${guest.phone}`
+                    ? ` · ${guest.phone}`
                     : ""}
                 </option>
               ))}
@@ -1460,7 +1460,7 @@ export default function NewReservationPage() {
               </div>
 
               <div style={selectedBadge}>
-                Selected âœ“
+                Selected ✓
               </div>
             </div>
           )}
@@ -1468,7 +1468,7 @@ export default function NewReservationPage() {
           <WizardButtons
             showBack
             onBack={() => setStep(2)}
-            nextLabel="Review Booking â†’"
+            nextLabel="Review Booking →"
             onNext={nextStep}
           />
         </section>
@@ -1534,7 +1534,7 @@ export default function NewReservationPage() {
                 adults === 1 ? "Adult" : "Adults"
               }${
                 children > 0
-                  ? ` Â· ${children} ${
+                  ? ` · ${children} ${
                       children === 1
                         ? "Child"
                         : "Children"
@@ -1617,7 +1617,7 @@ export default function NewReservationPage() {
             style={moreButton}
           >
             {showMore
-              ? "âˆ’ Hide Notes"
+              ? "− Hide Notes"
               : "+ More Details / Notes"}
           </button>
 
@@ -1647,7 +1647,7 @@ export default function NewReservationPage() {
               disabled={saving}
               style={backButton}
             >
-              â† Back
+              ← Back
             </button>
 
             <button
@@ -1689,7 +1689,7 @@ export default function NewReservationPage() {
                 onClick={closeGuestModal}
                 style={closeButton}
               >
-                Ã—
+                ×
               </button>
             </div>
 
@@ -1892,7 +1892,7 @@ function WizardProgress({
                   : {}),
               }}
             >
-              {completed ? "âœ“" : number}
+              {completed ? "✓" : number}
             </div>
 
             <span
@@ -1938,7 +1938,7 @@ function WizardButtons({
             onClick={onBack}
             style={backButton}
           >
-            â† Back
+            ← Back
           </button>
         )}
       </div>

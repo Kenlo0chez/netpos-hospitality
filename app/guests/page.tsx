@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   useEffect,
@@ -750,7 +750,7 @@ export default function GuestsPage() {
             onClick={cancelGuest}
             style={backButton}
           >
-            â† Back
+            ← Back
           </button>
 
           <h1 style={pageTitle}>
@@ -951,7 +951,7 @@ export default function GuestsPage() {
 
       {message && (
         <div style={successBox}>
-          âœ“ {message}
+          ✓ {message}
         </div>
       )}
 
@@ -1283,7 +1283,7 @@ export default function GuestsPage() {
           </strong>
 
           <div style={footerText}>
-            Guest Details â†’ Reservations â†’ Stay History â†’ Payments
+            Guest Details → Reservations → Stay History → Payments
           </div>
         </div>
 
@@ -1511,8 +1511,8 @@ function GuestForm({
         style={moreButton}
       >
         {showMore
-          ? "Hide More Options â–²"
-          : "More Options â–¼"}
+          ? "Hide More Options ▲"
+          : "More Options ▼"}
       </button>
 
       {showMore && (

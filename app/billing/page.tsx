@@ -23,7 +23,7 @@ export default function BillingPage() {
             <h2 style={sectionTitle}>Billing Workspace</h2>
             <p style={sectionText}>Select the financial task you want to work with.</p>
           </div>
-          <div style={liveBadge}>â— LIVE ACCOUNTING</div>
+          <div style={liveBadge}>● LIVE ACCOUNTING</div>
         </div>
 
         <div style={grid}>
@@ -44,7 +44,7 @@ export default function BillingPage() {
         <div style={workflowBar}>
           <strong style={workflowTitle}>Financial workflow</strong>
           <span style={workflowText}>
-            Quotation â†’ Reservation â†’ Guest Folio â†’ Payment â†’ Invoice / Receipt â†’ X Report / EOD
+            Quotation → Reservation → Guest Folio → Payment → Invoice / Receipt → X Report / EOD
           </span>
         </div>
       </section>
@@ -63,7 +63,7 @@ function BillingCard({ href, number, title, text, action, eod = false }: {
       </div>
       <h3 style={cardTitle}>{title}</h3>
       <p style={cardText}>{text}</p>
-      <div style={{ ...cardAction, ...(eod ? eodAction : {}) }}>{action} â†’</div>
+      <div style={{ ...cardAction, ...(eod ? eodAction : {}) }}>{action} →</div>
     </Link>
   );
 }

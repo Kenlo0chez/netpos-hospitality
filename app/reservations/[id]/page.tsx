@@ -1603,11 +1603,11 @@ export default function ReservationDetailsPage() {
         invoiceData as Invoice;
 
       const description =
-        `Accommodation Â· ${
+        `Accommodation · ${
           room
             ? `Room ${room.room_number}`
             : "Room"
-        } Â· ${
+        } · ${
           roomType?.name ?? ""
         }`;
 
@@ -2663,7 +2663,7 @@ ${body}
           }
           style={textButton}
         >
-          â† Reservation Calendar
+          ← Reservation Calendar
         </button>
 
         <div style={errorBox}>
@@ -2720,7 +2720,7 @@ ${body}
               }
               style={textButton}
             >
-              â† Reservation Calendar
+              ← Reservation Calendar
             </button>
 
             <div style={reservationHeading}>
@@ -2755,7 +2755,7 @@ ${body}
                 }
                 style={editButton}
               >
-                âœŽ Edit Reservation
+                ✎ Edit Reservation
               </button>
             )}
 
@@ -2828,14 +2828,14 @@ ${body}
               }}
               style={finishButton}
             >
-              âœ“ Finish
+              ✓ Finish
             </button>
           </div>
         </header>
 
         {message && (
           <div style={successBox}>
-            âœ“ {message}
+            ✓ {message}
           </div>
         )}
 
@@ -3070,7 +3070,7 @@ ${body}
                             </strong>
 
                             <span style={paymentDate}>
-                              {" Â· "}
+                              {" · "}
                               {formatDateTime(
                                 payment.received_at
                               )}
@@ -3113,7 +3113,7 @@ ${body}
                   <div style={folioReference}>
                     {reservation.reservation_number}
                     {room
-                      ? ` Â· Room ${room.room_number}`
+                      ? ` · Room ${room.room_number}`
                       : ""}
                   </div>
                 </div>
@@ -3227,12 +3227,12 @@ ${body}
                         {room
                           ? `Room ${room.room_number}`
                           : "Room"}
-                        {" Â· "}
+                        {" · "}
                         {roomType?.name ?? "-"}
-                        {" Â· "}
+                        {" · "}
                         {nights} night
                         {nights === 1 ? "" : "s"}
-                        {" Ã— "}
+                        {" × "}
                         {money(
                           Number(
                             reservationRoom?.nightly_rate ??
@@ -3321,7 +3321,7 @@ ${body}
                               {formatPaymentMethod(
                                 payment.payment_method
                               )}
-                              {" Â· "}
+                              {" · "}
                               {formatStatusText(
                                 payment.transaction_type
                               )}
@@ -3332,7 +3332,7 @@ ${body}
                                 payment.received_at
                               )}
                               {payment.payment_reference
-                                ? ` Â· Ref ${payment.payment_reference}`
+                                ? ` · Ref ${payment.payment_reference}`
                                 : ""}
                             </span>
                           </div>
@@ -3432,12 +3432,12 @@ ${body}
                             {formatDateTime(
                               payment.received_at
                             )}
-                            {" Â· "}
+                            {" · "}
                             {formatStatusText(
                               payment.transaction_type
                             )}
                             {payment.payment_reference
-                              ? ` Â· ${payment.payment_reference}`
+                              ? ` · ${payment.payment_reference}`
                               : ""}
                           </div>
 
@@ -3763,7 +3763,7 @@ ${body}
                   {
                     reservation.reservation_number
                   }
-                  {" Â· "}
+                  {" · "}
                   {guestName()}
                 </div>
               </div>
@@ -3777,7 +3777,7 @@ ${body}
                 }
                 style={closeButton}
               >
-                Ã—
+                ×
               </button>
             </div>
 

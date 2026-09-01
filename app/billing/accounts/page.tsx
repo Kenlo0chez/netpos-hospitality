@@ -212,7 +212,7 @@ export default function ReservationAccountsPage() {
     <main style={page}>
       <section style={header}>
         <div>
-          <div style={eyebrow}>BILLING Â· RESERVATION ACCOUNTS</div>
+          <div style={eyebrow}>BILLING · RESERVATION ACCOUNTS</div>
           <h1 style={title}>
             {outstandingOnly ? "Outstanding Accounts" : "Reservation Accounts"}
           </h1>
@@ -223,7 +223,7 @@ export default function ReservationAccountsPage() {
 
         <div style={headerActions}>
           <button onClick={() => router.push("/billing")} style={secondaryButton}>
-            â† Billing
+            ← Billing
           </button>
           <button onClick={loadAccounts} style={primaryButton}>
             Refresh
@@ -306,7 +306,7 @@ export default function ReservationAccountsPage() {
                       {account.roomNumber === "-" ? "-" : `Room ${account.roomNumber}`}
                     </td>
                     <td style={td}>
-                      {friendlyDate(account.reservation.arrival_date)} â†’{" "}
+                      {friendlyDate(account.reservation.arrival_date)} →{" "}
                       {friendlyDate(account.reservation.departure_date)}
                     </td>
                     <td style={td}>
@@ -336,7 +336,7 @@ export default function ReservationAccountsPage() {
                         }
                         style={openButton}
                       >
-                        Open Folio â†’
+                        Open Folio →
                       </button>
                     </td>
                   </tr>

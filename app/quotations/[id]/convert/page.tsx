@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   useEffect,
@@ -784,7 +784,7 @@ export default function ConvertQuotationPage() {
             }
             style={secondaryButton}
           >
-            â† Back to Quotations
+            ← Back to Quotations
           </button>
         </section>
       </main>
@@ -809,7 +809,7 @@ export default function ConvertQuotationPage() {
 
           <div style={heroSub}>
             {quotation.quotation_number}
-            {" Â· "}
+            {" · "}
             {property?.name ?? ""}
           </div>
         </div>
@@ -823,7 +823,7 @@ export default function ConvertQuotationPage() {
           }
           style={heroBackButton}
         >
-          â† Quotations
+          ← Quotations
         </button>
       </section>
 
@@ -867,7 +867,7 @@ export default function ConvertQuotationPage() {
               label="Stay"
               value={`${formatDate(
                 quotation.arrival_date
-              )} â†’ ${formatDate(
+              )} → ${formatDate(
                 quotation.departure_date
               )}`}
             />
@@ -964,7 +964,7 @@ export default function ConvertQuotationPage() {
                       ? ` - ${room.room_name}`
                       : ""}
                     {room.housekeeping_status
-                      ? ` Â· ${formatStatus(
+                      ? ` · ${formatStatus(
                           room.housekeeping_status
                         )}`
                       : ""}
@@ -994,7 +994,7 @@ export default function ConvertQuotationPage() {
                 <div style={selectedRoomMeta}>
                   {roomType?.name ?? ""}
                   {selectedRoom.housekeeping_status
-                    ? ` Â· ${formatStatus(
+                    ? ` · ${formatStatus(
                         selectedRoom.housekeeping_status
                       )}`
                     : ""}
