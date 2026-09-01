@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   useEffect,
@@ -295,9 +295,9 @@ export default function NetposAccessGuard({
                   <span style={staffMeta}>
                     {roleLabel(staff.role)}
                     {staff.role === "owner"
-                      ? " · All Properties"
+                      ? " � All Properties"
                       : staff.property_id
-                      ? " · Assigned Property"
+                      ? " � Assigned Property"
                       : ""}
                   </span>
                 </div>
@@ -512,7 +512,7 @@ const staffIdentity: CSSProperties = {
   alignItems: "center",
   gap: 8,
   color: "#294760",
-  fontSize: 9,
+  fontSize: 15,
 };
 
 const staffDot: CSSProperties = {
@@ -569,8 +569,8 @@ const menuInner: CSSProperties = {
   width: "100%",
   display: "flex",
   alignItems: "center",
-  gap: 3,
-  padding: "6px 18px",
+  gap: 5,
+  padding: "7px 18px",
   overflowX: "auto",
   boxSizing: "border-box",
 };
@@ -579,10 +579,10 @@ const menuLink: CSSProperties = {
   flex: "0 0 auto",
   textDecoration: "none",
   color: "#EAF5FD",
-  padding: "8px 10px",
+  padding: "11px 16px",
   border: "1px solid transparent",
   borderRadius: 7,
-  fontSize: 9,
+  fontSize: 15,
   fontWeight: 800,
   whiteSpace: "nowrap",
 };

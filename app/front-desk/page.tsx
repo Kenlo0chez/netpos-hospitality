@@ -2045,7 +2045,7 @@ const pageStyle: CSSProperties = {
   minHeight: "calc(100vh - 100px)",
   maxWidth: 1500,
   margin: "0 auto",
-  padding: "15px 22px 14px",
+  padding: "12px 22px 10px",
   fontFamily: "Arial, sans-serif",
   color: TEXT,
   background:
@@ -2058,20 +2058,20 @@ const pageHeadingRow: CSSProperties = {
   justifyContent: "space-between",
   alignItems: "flex-end",
   gap: 18,
-  marginBottom: 12,
+  marginBottom: 9,
 };
 
 const eyebrowStyle: CSSProperties = {
   marginBottom: 4,
   color: GREEN,
-  fontSize: 7.5,
+  fontSize: 11.5,
   fontWeight: 900,
   letterSpacing: 0.9,
 };
 
 const titleStyle: CSSProperties = {
   margin: 0,
-  fontSize: 25,
+  fontSize: 28,
   lineHeight: 1,
   color: DARK_BLUE,
   fontWeight: 900,
@@ -2079,7 +2079,7 @@ const titleStyle: CSSProperties = {
 
 const subtitleStyle: CSSProperties = {
   color: MUTED,
-  fontSize: 9,
+  fontSize: 13,
   marginTop: 5,
 };
 
@@ -2096,7 +2096,7 @@ const propertyArea: CSSProperties = {
 const propertyLabel: CSSProperties = {
   display: "block",
   color: "#668096",
-  fontSize: 7,
+  fontSize: 11.5,
   fontWeight: 900,
   letterSpacing: 0.65,
   marginBottom: 4,
@@ -2110,7 +2110,7 @@ const propertySelect: CSSProperties = {
   borderRadius: 7,
   background: "#FFFFFF",
   color: TEXT,
-  fontSize: 9,
+  fontSize: 13,
   fontWeight: 800,
   outline: "none",
 };
@@ -2122,7 +2122,7 @@ const newReservationButton: CSSProperties = {
   background: BLUE,
   color: "#FFFFFF",
   padding: "0 13px",
-  fontSize: 8.5,
+  fontSize: 13,
   fontWeight: 900,
   cursor: "pointer",
   boxShadow: "0 3px 9px rgba(13,95,168,.14)",
@@ -2135,7 +2135,7 @@ const secondaryTopButton: CSSProperties = {
   background: "#FFFFFF",
   color: BLUE,
   padding: "0 12px",
-  fontSize: 8.5,
+  fontSize: 13,
   fontWeight: 900,
   cursor: "pointer",
 };
@@ -2144,7 +2144,7 @@ const summaryGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(6,minmax(0,1fr))",
   gap: 7,
-  marginBottom: 10,
+  marginBottom: 8,
 };
 
 const summaryCard: CSSProperties = {
@@ -2157,7 +2157,7 @@ const summaryCard: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  gap: 9,
+  gap: 7,
   boxShadow: "0 3px 10px rgba(22,62,94,.04)",
 };
 
@@ -2183,7 +2183,7 @@ const summaryOutstanding: CSSProperties = {
 
 const summaryLabel: CSSProperties = {
   color: "#5F778C",
-  fontSize: 7.5,
+  fontSize: 11.5,
   fontWeight: 900,
   textTransform: "uppercase",
   marginBottom: 3,
@@ -2192,17 +2192,17 @@ const summaryLabel: CSSProperties = {
 
 const summaryDescription: CSSProperties = {
   color: "#8A99A7",
-  fontSize: 7,
+  fontSize: 11.5,
 };
 
 const summaryValue: CSSProperties = {
-  fontSize: 27,
+  fontSize: 29,
   lineHeight: 1,
   color: DARK_BLUE,
 };
 
 const summaryMoney: CSSProperties = {
-  fontSize: 17,
+  fontSize: 18,
   lineHeight: 1,
   color: DARK_BLUE,
   whiteSpace: "nowrap",
@@ -2212,18 +2212,18 @@ const dashboardGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns:
     "minmax(0,1.58fr) minmax(365px,.82fr)",
-  gap: 9,
+  gap: 7,
   alignItems: "start",
 };
 
 const leftColumn: CSSProperties = {
   display: "grid",
-  gap: 9,
+  gap: 7,
 };
 
 const rightColumn: CSSProperties = {
   display: "grid",
-  gap: 9,
+  gap: 7,
 };
 
 const panelStyle: CSSProperties = {
@@ -2253,13 +2253,13 @@ const panelHeadingRow: CSSProperties = {
 };
 
 const panelTitle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 13,
   color: DARK_BLUE,
 };
 
 const panelSubtitle: CSSProperties = {
   color: MUTED,
-  fontSize: 7.5,
+  fontSize: 11.5,
   marginTop: 2,
 };
 
@@ -2273,7 +2273,7 @@ const countBadge: CSSProperties = {
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
-  fontSize: 8,
+  fontSize: 12,
   fontWeight: 900,
 };
 
@@ -2283,7 +2283,7 @@ const smallHeaderButton: CSSProperties = {
   background: "#FFFFFF",
   color: BLUE,
   padding: "5px 8px",
-  fontSize: 7.5,
+  fontSize: 11.5,
   fontWeight: 900,
   cursor: "pointer",
 };
@@ -2312,7 +2312,7 @@ const guestPrimary: CSSProperties = {
 
 const guestNameStyle: CSSProperties = {
   display: "block",
-  fontSize: 10.5,
+  fontSize: 12,
   color: TEXT,
   whiteSpace: "nowrap",
   overflow: "hidden",
@@ -2323,7 +2323,7 @@ const reservationNumber: CSSProperties = {
   display: "block",
   marginTop: 2,
   color: MUTED,
-  fontSize: 7.5,
+  fontSize: 11.5,
 };
 
 const guestInfoGroup: CSSProperties = {
@@ -2335,7 +2335,7 @@ const guestInfoGroup: CSSProperties = {
 const infoLabel: CSSProperties = {
   display: "block",
   color: "#8293A2",
-  fontSize: 6.5,
+  fontSize: 13,
   fontWeight: 900,
   textTransform: "uppercase",
   marginBottom: 2,
@@ -2343,7 +2343,7 @@ const infoLabel: CSSProperties = {
 
 const infoValue: CSSProperties = {
   display: "block",
-  fontSize: 8.5,
+  fontSize: 13,
   color: TEXT,
   whiteSpace: "nowrap",
 };
@@ -2355,7 +2355,7 @@ const rowActionPrimary: CSSProperties = {
   background: GREEN,
   color: "#FFFFFF",
   padding: "7px 5px",
-  fontSize: 8,
+  fontSize: 12,
   fontWeight: 900,
   cursor: "pointer",
 };
@@ -2383,20 +2383,20 @@ const compactOpenButton: CSSProperties = {
 };
 
 const compactGuestName: CSSProperties = {
-  fontSize: 9.5,
+  fontSize: 11.5,
   color: TEXT,
 };
 
 const compactSubtext: CSSProperties = {
   marginTop: 2,
   color: MUTED,
-  fontSize: 7.5,
+  fontSize: 11.5,
 };
 
 const compactBalance: CSSProperties = {
   textAlign: "right",
   color: BLUE,
-  fontSize: 7.5,
+  fontSize: 11.5,
 };
 
 const compactActionButton: CSSProperties = {
@@ -2405,7 +2405,7 @@ const compactActionButton: CSSProperties = {
   borderRadius: 6,
   background: GREEN,
   color: "#FFFFFF",
-  fontSize: 7.5,
+  fontSize: 11.5,
   fontWeight: 900,
   cursor: "pointer",
 };
@@ -2424,13 +2424,13 @@ const balanceRow: CSSProperties = {
 };
 
 const balanceGuest: CSSProperties = {
-  fontSize: 9.5,
+  fontSize: 11.5,
   color: TEXT,
 };
 
 const balanceAmount: CSSProperties = {
   color: BLUE,
-  fontSize: 10.5,
+  fontSize: 12,
 };
 
 const roomStatusGrid: CSSProperties = {
@@ -2448,7 +2448,7 @@ const roomStatusCard: CSSProperties = {
   justifyContent: "space-between",
   alignItems: "center",
   gap: 7,
-  fontSize: 8.5,
+  fontSize: 13,
 };
 
 const dirtyRoomCard: CSSProperties = {
@@ -2465,13 +2465,13 @@ const roomNameText: CSSProperties = {
   display: "block",
   marginTop: 2,
   color: MUTED,
-  fontSize: 7,
+  fontSize: 11.5,
 };
 
 const roomStatusBadge: CSSProperties = {
   padding: "3px 6px",
   borderRadius: 15,
-  fontSize: 6.5,
+  fontSize: 13,
   fontWeight: 900,
 };
 
@@ -2489,9 +2489,9 @@ const housekeepingClear: CSSProperties = {
   padding: "13px 11px",
   display: "flex",
   alignItems: "center",
-  gap: 9,
+  gap: 7,
   color: GREEN,
-  fontSize: 8.5,
+  fontSize: 13,
 };
 
 const housekeepingClearIcon: CSSProperties = {
@@ -2514,13 +2514,13 @@ const housekeepingFooter: CSSProperties = {
   borderTop: "1px solid #E4ECF2",
   background: "#F7FCF9",
   color: GREEN,
-  fontSize: 8.5,
+  fontSize: 13,
 };
 
 const emptyRow: CSSProperties = {
   padding: "13px 11px",
   color: MUTED,
-  fontSize: 8.5,
+  fontSize: 13,
   display: "flex",
   alignItems: "center",
   gap: 8,
@@ -2535,7 +2535,7 @@ const emptyIcon: CSSProperties = {
   justifyContent: "center",
   background: LIGHT_GREEN,
   color: GREEN,
-  fontSize: 9,
+  fontSize: 13,
   fontWeight: 900,
 };
 
@@ -2546,7 +2546,7 @@ const successBox: CSSProperties = {
   borderRadius: 7,
   background: LIGHT_GREEN,
   color: "#146D45",
-  fontSize: 8.5,
+  fontSize: 13,
   fontWeight: 800,
 };
 
@@ -2557,7 +2557,7 @@ const errorBox: CSSProperties = {
   borderRadius: 7,
   background: "#FFF4F4",
   color: "#A11A1A",
-  fontSize: 8.5,
+  fontSize: 13,
 };
 
 const loadingBox: CSSProperties = {
@@ -2567,7 +2567,7 @@ const loadingBox: CSSProperties = {
   textAlign: "center",
   background: "#FFFFFF",
   color: MUTED,
-  fontSize: 10,
+  fontSize: 11.5,
 };
 
 const footerStyle: CSSProperties = {
@@ -2594,7 +2594,7 @@ const workflowStep: CSSProperties = {
   alignItems: "center",
   gap: 5,
   color: "#60778B",
-  fontSize: 7.5,
+  fontSize: 11.5,
 };
 
 const workflowNumber: CSSProperties = {
@@ -2606,13 +2606,13 @@ const workflowNumber: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  fontSize: 7,
+  fontSize: 11.5,
   fontWeight: 900,
 };
 
 const workflowArrow: CSSProperties = {
   color: "#A1AFBD",
-  fontSize: 10,
+  fontSize: 11.5,
 };
 
 const footerActions: CSSProperties = {
@@ -2626,7 +2626,7 @@ const footerButton: CSSProperties = {
   background: "#FFFFFF",
   color: BLUE,
   padding: "7px 10px",
-  fontSize: 8,
+  fontSize: 12,
   fontWeight: 900,
   cursor: "pointer",
 };
