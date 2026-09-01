@@ -1738,13 +1738,26 @@ function PropertyPerformanceTable({
                       propertyPerformanceName
                     }
                   >
-                    <strong>
+                    <strong
+                      style={{
+                        display: "block",
+                        fontSize: 13,
+                        marginBottom: 3,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {row.name}
                     </strong>
 
-                    <span>
-                      {row.occupied}/
-                      {row.rooms} rooms occupied
+                    <span
+                      style={{
+                        display: "block",
+                        color: MUTED,
+                        fontSize: 11.5,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {row.occupied}/{row.rooms} rooms occupied
                     </span>
                   </td>
 
@@ -2821,31 +2834,32 @@ const propertyPerformanceHint: CSSProperties = {
 };
 
 const propertyPerformanceTableWrap: CSSProperties = {
-  maxHeight: 148,
-  overflowY: "auto",
   overflowX: "auto",
+  overflowY: "visible",
 };
 
 const propertyPerformanceTable: CSSProperties = {
   width: "100%",
+  minWidth: 1180,
   borderCollapse: "collapse",
-  tableLayout: "fixed",
+  tableLayout: "auto",
 };
 
 const propertyPerformanceTh: CSSProperties = {
-  padding: "6px 6px",
+  padding: "9px 12px",
   borderBottom: "1px solid #E8EEF3",
   background: "#F8FBFD",
   color: "#60778B",
   fontSize: 11.5,
   fontWeight: 900,
-  textAlign: "right",
+  textAlign: "center",
   whiteSpace: "nowrap",
 };
 
 const propertyPerformanceThLeft: CSSProperties = {
   ...propertyPerformanceTh,
-  width: "20%",
+  width: 250,
+  minWidth: 250,
   textAlign: "left",
 };
 
@@ -2855,17 +2869,21 @@ const propertyPerformanceRow: CSSProperties = {
 };
 
 const propertyPerformanceName: CSSProperties = {
-  padding: "6px 8px",
+  width: 250,
+  minWidth: 250,
+  padding: "10px 12px",
   color: TEXT,
   fontSize: 13,
+  lineHeight: 1.35,
   textAlign: "left",
 };
 
 const propertyPerformanceTd: CSSProperties = {
-  padding: "6px 6px",
+  minWidth: 88,
+  padding: "10px 12px",
   color: TEXT,
   fontSize: 13,
-  textAlign: "right",
+  textAlign: "center",
   whiteSpace: "nowrap",
 };
 
