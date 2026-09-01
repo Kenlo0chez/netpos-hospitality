@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -468,7 +468,7 @@ export default function ReservationsPage() {
 
   return (
     <main style={pageStyle}>
-      <div style={pageHeader}>
+      <div style={viewMode === "board" ? compactBoardPageHeader : pageHeader}>
         <div>
           <div style={eyebrow}>ROOM CONTROL</div>
 
@@ -1545,9 +1545,9 @@ const LIGHT_BLUE = "#EDF6FE";
 const LIGHT_GREEN = "#ECF8F2";
 
 const pageStyle: React.CSSProperties = {
-  maxWidth: 1500,
+  maxWidth: 1600,
   margin: "0 auto",
-  padding: "15px 22px 22px",
+  padding: "8px 14px 10px",
   fontFamily: "Arial, sans-serif",
   color: TEXT,
   background: "linear-gradient(180deg,#F7FAFD 0%,#F5F8FB 100%)",
@@ -1561,6 +1561,10 @@ const pageHeader: React.CSSProperties = {
   alignItems: "flex-end",
   gap: 18,
   marginBottom: 11,
+};
+
+const compactBoardPageHeader: React.CSSProperties = {
+  display: "none",
 };
 
 const eyebrow: React.CSSProperties = {
@@ -1643,12 +1647,12 @@ const controlBar: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  gap: 15,
+  gap: 12,
   border: `1px solid ${BORDER}`,
   borderRadius: 9,
-  padding: "8px 10px",
+  padding: "6px 9px",
   background: "#FFFFFF",
-  marginBottom: 9,
+  marginBottom: 7,
   boxShadow: "0 3px 10px rgba(22,62,94,.035)",
 };
 
@@ -1719,10 +1723,10 @@ const boardToolbar: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  gap: 15,
+  gap: 12,
   border: `1px solid ${BORDER}`,
   borderRadius: "10px 10px 0 0",
-  padding: "9px 11px",
+  padding: "7px 10px",
   background: "linear-gradient(90deg,#F8FBFD 0%,#FFFFFF 100%)",
 };
 
@@ -1764,12 +1768,12 @@ const selectionInstruction: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  gap: 15,
-  padding: "8px 11px",
+  gap: 12,
+  padding: "5px 10px",
   borderLeft: `1px solid ${BORDER}`,
   borderRight: `1px solid ${BORDER}`,
   background: "#F7FAFD",
-  fontSize: 8.5,
+  fontSize: 8,
   color: "#4F687E",
 };
 
@@ -1833,13 +1837,13 @@ const cancelSelectionButton: React.CSSProperties = {
 
 const legendRow: React.CSSProperties = {
   display: "flex",
-  gap: 13,
+  gap: 12,
   alignItems: "center",
   borderLeft: `1px solid ${BORDER}`,
   borderRight: `1px solid ${BORDER}`,
-  padding: "6px 11px",
+  padding: "4px 10px",
   background: "#FBFCFD",
-  fontSize: 7.5,
+  fontSize: 7.25,
 };
 
 const legendItem: React.CSSProperties = {
@@ -1866,7 +1870,9 @@ const boardWrapper: React.CSSProperties = {
 
 const boardScroll: React.CSSProperties = {
   width: "100%",
+  maxHeight: "calc(100vh - 300px)",
   overflowX: "auto",
+  overflowY: "auto",
 };
 
 const boardGrid: React.CSSProperties = {
@@ -1890,7 +1896,7 @@ const roomHeaderCell: React.CSSProperties = {
 };
 
 const dateHeaderCell: React.CSSProperties = {
-  height: 45,
+  height: 38,
   display: "flex",
   flexDirection: "column",
   justifyContent: "center",
@@ -1924,11 +1930,11 @@ const roomNameCell: React.CSSProperties = {
   position: "sticky",
   left: 0,
   zIndex: 4,
-  minHeight: 50,
+  minHeight: 42,
   background: "#FFFFFF",
   borderRight: "1px solid #C8D9E6",
   borderBottom: "1px solid #E7EEF3",
-  padding: "8px 10px",
+  padding: "5px 9px",
   display: "flex",
   flexDirection: "column",
   justifyContent: "center",
@@ -1958,7 +1964,7 @@ const roomSelectingBadge: React.CSSProperties = {
 };
 
 const availableRoomButton: React.CSSProperties = {
-  minHeight: 50,
+  minHeight: 42,
   border: 0,
   borderRight: "1px solid #EDF1F4",
   borderBottom: "1px solid #EDF1F4",
@@ -2017,7 +2023,7 @@ const availablePlus: React.CSSProperties = {
 };
 
 const bookingCell: React.CSSProperties = {
-  minHeight: 50,
+  minHeight: 42,
   border: 0,
   borderRight: "1px solid rgba(0,0,0,.06)",
   borderBottom: "1px solid #E8EEF3",
@@ -2078,8 +2084,8 @@ const boardBottomBar: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  gap: 12,
-  marginTop: 7,
+  gap: 10,
+  marginTop: 5,
 };
 
 const boardHint: React.CSSProperties = {
@@ -2202,3 +2208,4 @@ const rowGrid: React.CSSProperties = {
   color: TEXT,
   cursor: "pointer",
 };
+
