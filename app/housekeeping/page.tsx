@@ -358,7 +358,7 @@ export default function HousekeepingPage() {
       )}
 
       <footer style={footer}>
-        <span>Normal workflow: Dirty → Cleaning → Clean</span>
+        <span>Normal workflow: Dirty to Cleaning to Clean</span>
 
         <button
           type="button"
@@ -417,120 +417,138 @@ function StatusBadge({
 
 const page: CSSProperties = {
   minHeight: "100vh",
-  maxWidth: 1450,
+  maxWidth: 1600,
   margin: "0 auto",
-  padding: "18px 24px",
+  padding: "10px 16px 12px",
   background: "#F4F8FC",
   color: "#17324D",
   fontFamily: "Arial, sans-serif",
+  boxSizing: "border-box",
 };
 
 const heading: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  marginBottom: 16,
+  gap: 12,
+  marginBottom: 9,
 };
 
 const title: CSSProperties = {
   margin: 0,
   color: "#0D4F91",
-  fontSize: 28,
+  fontSize: 23,
+  lineHeight: 1.05,
 };
 
 const subtitle: CSSProperties = {
-  marginTop: 4,
+  marginTop: 2,
   color: "#6F7D8C",
-  fontSize: 12,
+  fontSize: 10,
 };
 
 const select: CSSProperties = {
-  width: 260,
-  padding: "10px 12px",
+  width: 245,
+  padding: "8px 10px",
   border: "1px solid #C7D6E3",
-  borderRadius: 8,
+  borderRadius: 7,
   background: "#fff",
+  fontSize: 10,
+  fontWeight: 700,
 };
 
 const summaryGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(4,1fr)",
-  gap: 10,
-  marginBottom: 14,
+  gap: 7,
+  marginBottom: 8,
 };
 
 const summaryCard: CSSProperties = {
+  minHeight: 42,
   background: "#fff",
   border: "1px solid #D5E2ED",
-  borderRadius: 10,
-  padding: "14px 16px",
+  borderRadius: 8,
+  padding: "7px 10px",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
+  boxSizing: "border-box",
 };
 
 const summaryLabel: CSSProperties = {
   color: "#557089",
-  fontSize: 11,
+  fontSize: 9,
   fontWeight: 800,
 };
 
 const summaryValue: CSSProperties = {
   color: "#0D5FA8",
-  fontSize: 22,
+  fontSize: 18,
+  lineHeight: 1,
 };
 
 const roomGrid: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit,minmax(245px,1fr))",
-  gap: 12,
+  gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))",
+  gap: 7,
+  alignContent: "start",
 };
 
 const roomCard: CSSProperties = {
+  minWidth: 0,
   background: "#fff",
   border: "1px solid #D5E2ED",
-  borderRadius: 10,
-  padding: 14,
+  borderRadius: 8,
+  padding: "8px 9px",
 };
 
 const roomHeader: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "flex-start",
-  gap: 10,
+  gap: 6,
 };
 
 const roomLabel: CSSProperties = {
-  fontSize: 8,
+  fontSize: 7,
   fontWeight: 800,
   color: "#7A8794",
 };
 
 const roomNumber: CSSProperties = {
-  fontSize: 25,
+  fontSize: 19,
+  lineHeight: 1,
   fontWeight: 900,
   color: "#0D4F91",
 };
 
 const roomName: CSSProperties = {
-  marginTop: 3,
-  fontSize: 10,
+  marginTop: 2,
+  fontSize: 8,
   color: "#6F7D8C",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  maxWidth: 120,
 };
 
 const buttonGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(3,1fr)",
-  gap: 6,
-  marginTop: 14,
+  gap: 4,
+  marginTop: 7,
 };
 
 const button: CSSProperties = {
-  padding: "9px 6px",
+  minHeight: 26,
+  padding: "4px 3px",
   background: "#fff",
   border: "1px solid #C7D6E3",
-  borderRadius: 7,
+  borderRadius: 5,
   cursor: "pointer",
+  fontSize: 8,
+  lineHeight: 1,
 };
 
 const primaryButton: CSSProperties = {
@@ -543,21 +561,25 @@ const primaryButton: CSSProperties = {
 
 const outButton: CSSProperties = {
   width: "100%",
-  marginTop: 8,
-  padding: "8px",
+  minHeight: 24,
+  marginTop: 4,
+  padding: "4px",
   border: "1px solid #D5E2ED",
-  borderRadius: 7,
+  borderRadius: 5,
   background: "#F5F7F9",
   color: "#566573",
   cursor: "pointer",
+  fontSize: 8,
+  lineHeight: 1,
 };
 
 const badge: CSSProperties = {
   display: "inline-block",
-  padding: "5px 8px",
+  padding: "3px 6px",
   borderRadius: 999,
-  fontSize: 8,
+  fontSize: 7,
   fontWeight: 900,
+  whiteSpace: "nowrap",
 };
 
 const cleanBadge: CSSProperties = {
@@ -581,19 +603,21 @@ const outBadge: CSSProperties = {
 };
 
 const successBox: CSSProperties = {
-  marginBottom: 10,
-  padding: "9px 11px",
-  borderRadius: 7,
+  marginBottom: 7,
+  padding: "6px 9px",
+  borderRadius: 6,
   background: "#EAF7F0",
   color: "#168257",
+  fontSize: 9,
 };
 
 const errorBox: CSSProperties = {
-  marginBottom: 10,
-  padding: "9px 11px",
-  borderRadius: 7,
+  marginBottom: 7,
+  padding: "6px 9px",
+  borderRadius: 6,
   background: "#FFF0F0",
   color: "#A32626",
+  fontSize: 9,
 };
 
 const emptyBox: CSSProperties = {
@@ -606,22 +630,23 @@ const emptyBox: CSSProperties = {
 };
 
 const footer: CSSProperties = {
-  marginTop: 16,
-  paddingTop: 12,
+  marginTop: 7,
+  paddingTop: 6,
   borderTop: "1px solid #D5E2ED",
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
   color: "#6F7D8C",
-  fontSize: 10,
+  fontSize: 8,
 };
 
 const finishButton: CSSProperties = {
-  padding: "10px 18px",
+  padding: "7px 13px",
   border: 0,
-  borderRadius: 7,
+  borderRadius: 6,
   background: "#168257",
   color: "#fff",
+  fontSize: 8,
   fontWeight: 800,
   cursor: "pointer",
 };
