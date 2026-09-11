@@ -45,6 +45,25 @@ export default function LoginPage() {
         });
 
       if (error) {
+        const detail = error.message.toLowerCase();
+
+        if (
+          detail.includes("fetch") ||
+          detail.includes("network") ||
+          detail.includes("service unavailable") ||
+          detail.includes("timeout")
+        ) {
+          throw new Error(
+            "Netpos services are temporarily unavailable. Please wait a moment and try again."
+          );
+        }
+
+        if (detail.includes("email not confirmed")) {
+          throw new Error(
+            "This user account has not been activated. Contact the system administrator."
+          );
+        }
+
         throw new Error("Invalid User ID or password.");
       }
 
