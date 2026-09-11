@@ -121,8 +121,8 @@ export default function FinancePage() {
         <div style={panel}>
           <div style={panelHeading}><div><h2 style={panelTitle}>Today’s finance work</h2><p style={panelText}>Complete these controls in order.</p></div></div>
           <div style={taskList}>
-            <Task number="1" title="Allocate EFT payments" detail="Match every bank payment to a guest, reservation, company or invoice." status={totals.unmatchedEft ? `${totals.unmatchedEft} waiting` : "Up to date"} />
-            <Task number="2" title="Review guest and company accounts" detail="Follow up issued and part-paid invoices before they become overdue." status={`${invoices.filter((x) => x.status === "issued" || x.status === "part_paid").length} open`} />
+            <Task number="1" title="Allocate EFT payments" detail="Match every bank payment to the correct invoice." href="/finance/eft" status={totals.unmatchedEft ? `${totals.unmatchedEft} waiting` : "Open allocations"} />
+            <Task number="2" title="Review guest and company accounts" detail="Follow up outstanding reservation accounts before they become overdue." href="/billing/accounts?filter=outstanding" status={`${invoices.filter((x) => x.status === "issued" || x.status === "part_paid").length} open invoices`} />
             <Task number="3" title="Complete X Report and EOD" detail="Compare expected cash, card and EFT totals, then close the business day." href="/cash-up" status="Open control" />
           </div>
         </div>
