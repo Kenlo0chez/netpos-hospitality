@@ -124,6 +124,7 @@ export default function FinancePage() {
             <Task number="1" title="Allocate EFT payments" detail="Match every bank payment to the correct invoice." href="/finance/eft" status={totals.unmatchedEft ? `${totals.unmatchedEft} waiting` : "Open allocations"} />
             <Task number="2" title="Review guest and company accounts" detail="Follow up outstanding reservation accounts before they become overdue." href="/billing/accounts?filter=outstanding" status={`${invoices.filter((x) => x.status === "issued" || x.status === "part_paid").length} open invoices`} />
             <Task number="3" title="Complete X Report and EOD" detail="Compare expected cash, card and EFT totals, then close the business day." href="/cash-up" status="Open control" />
+            <Task number="4" title="Review cashbook and expenses" detail="See all money in and money out, then capture operating expenses." href="/finance/cashbook" status="Open cashbook" />
           </div>
         </div>
 
