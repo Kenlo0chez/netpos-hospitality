@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import FinanceSubnav from "@/src/components/FinanceSubnav";
 import {
   useCallback,
   useEffect,
@@ -430,6 +431,7 @@ export default function BankReconciliationPage() {
           </select>
         </div>
       </header>
+      <FinanceSubnav />
 
       {setupRequired && <Notice tone="warning" title="Finance database setup required." text="Migration 002 must be applied before bank reconciliation can be used." />}
       {errorMessage && !setupRequired && <Notice tone="error" title="Could not complete that action." text={errorMessage} />}
