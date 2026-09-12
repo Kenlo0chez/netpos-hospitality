@@ -106,6 +106,7 @@ type ReservationRoom = {
 
 type Room = {
   id: string;
+  room_type_id: string;
   room_number: string;
   housekeeping_status: string | null;
   operational_status: string | null;
@@ -252,6 +253,8 @@ export default function ReservationDetailsPage() {
     setRoomType,
   ] = useState<RoomType | null>(null);
 
+  const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
+
   const [
     payments,
     setPayments,
@@ -354,6 +357,13 @@ export default function ReservationDetailsPage() {
     currentStaffRole,
     setCurrentStaffRole,
   ] = useState("");
+
+  const [showCorrectionModal, setShowCorrectionModal] = useState(false);
+  const [correctionArrival, setCorrectionArrival] = useState("");
+  const [correctionDeparture, setCorrectionDeparture] = useState("");
+  const [correctionRoomId, setCorrectionRoomId] = useState("");
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [savingCorrection, setSavingCorrection] = useState(false);
 
   const canProcessRefund =
     currentStaffRole === "owner" ||
@@ -637,6 +647,7 @@ export default function ReservationDetailsPage() {
           .from("rooms")
           .select(`
             id,
+            room_type_id,
             room_number,
             housekeeping_status,
             operational_status
@@ -659,6 +670,19 @@ export default function ReservationDetailsPage() {
       } else {
         setRoom(null);
       }
+
+      const { data: propertyRooms, error: propertyRoomsError } = await supabase
+        .from("rooms")
+        .select("id,room_type_id,room_number,housekeeping_status,operational_status")
+        .eq("property_id", loadedReservation.property_id)
+        .eq("operational_status", "active")
+        .order("room_number");
+
+      if (propertyRoomsError) {
+        throw new Error(propertyRoomsError.message);
+      }
+
+      setAvailableRooms((propertyRooms as Room[]) ?? []);
 
       // -----------------------------------------------------
       // ROOM TYPE
@@ -1400,6 +1424,211 @@ export default function ReservationDetailsPage() {
     }
   }
 
+  function openStayCorrection() {
+    if (!reservation || !reservationRoom) return;
+    setCorrectionArrival(reservation.arrival_date);
+    setCorrectionDeparture(reservation.departure_date);
+    setCorrectionRoomId(reservationRoom.room_id ?? "");
+    setCorrectionReason("");
+    setShowCorrectionModal(true);
+  }
+
+  async function logReservationAction(
+    action: string,
+    oldValues: Record<string, unknown>,
+    newValues: Record<string, unknown>,
+    reason: string,
+  ) {
+    if (!reservation) return;
+    const { error } = await supabase.from("audit_logs").insert({
+      property_id: reservation.property_id,
+      user_id: null,
+      action,
+      entity_type: "reservation",
+      entity_id: reservation.id,
+      old_values: oldValues,
+      new_values: newValues,
+      reason,
+    });
+    if (error) console.error("Audit log:", error.message);
+  }
+
+  async function saveStayCorrection(event: FormEvent) {
+    event.preventDefault();
+    if (!reservation || !reservationRoom) return;
+    if (!correctionArrival || !correctionDeparture || correctionDeparture <= correctionArrival) {
+      alert("Check-out must be after check-in.");
+      return;
+    }
+    if (!correctionRoomId) {
+      alert("Select a physical room.");
+      return;
+    }
+    if (!correctionReason.trim()) {
+      alert("Enter the reason for changing the stay.");
+      return;
+    }
+
+    const targetRoom = availableRooms.find((item) => item.id === correctionRoomId);
+    if (!targetRoom) {
+      alert("The selected room is not active.");
+      return;
+    }
+    if (targetRoom.room_type_id !== reservationRoom.room_type_id) {
+      alert("Select a room of the same room type so the agreed rate remains correct.");
+      return;
+    }
+    if (
+      reservation.status === "checked_in" &&
+      correctionRoomId !== reservationRoom.room_id &&
+      targetRoom.housekeeping_status !== "clean"
+    ) {
+      alert(`Room ${targetRoom.room_number} must be Clean before moving an in-house guest.`);
+      return;
+    }
+
+    setSavingCorrection(true);
+    try {
+      const { data: possibleConflicts, error: conflictError } = await supabase
+        .from("reservation_rooms")
+        .select("reservation_id,arrival_date,departure_date,reservations(status)")
+        .eq("room_id", correctionRoomId)
+        .neq("reservation_id", reservation.id)
+        .lt("arrival_date", correctionDeparture)
+        .gt("departure_date", correctionArrival);
+
+      if (conflictError) throw new Error(conflictError.message);
+      const hasConflict = ((possibleConflicts as unknown as Array<{ reservations: { status: string } | null }>) ?? [])
+        .some((item) => item.reservations && ["provisional", "confirmed", "checked_in"].includes(item.reservations.status));
+      if (hasConflict) {
+        throw new Error(`Room ${targetRoom.room_number} is already booked during the selected dates.`);
+      }
+
+      const newNights = calculateNights(correctionArrival, correctionDeparture);
+      const newSubtotal = newNights * Number(reservationRoom.nightly_rate);
+      const newTotal = Math.max(0, newSubtotal - Number(reservation.discount_amount ?? 0));
+      const vatRate = Number(property?.vat_rate ?? 15);
+      const newVat = vatRate > 0 ? newTotal - newTotal / (1 + vatRate / 100) : 0;
+      const oldValues = {
+        arrival_date: reservation.arrival_date,
+        departure_date: reservation.departure_date,
+        room_id: reservationRoom.room_id,
+        total_amount: reservation.total_amount,
+      };
+
+      const { error: reservationError } = await supabase
+        .from("reservations")
+        .update({
+          arrival_date: correctionArrival,
+          departure_date: correctionDeparture,
+          subtotal: newSubtotal,
+          vat_amount: newVat,
+          total_amount: newTotal,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", reservation.id);
+      if (reservationError) throw new Error(reservationError.message);
+
+      const { error: roomError } = await supabase
+        .from("reservation_rooms")
+        .update({
+          room_id: correctionRoomId,
+          arrival_date: correctionArrival,
+          departure_date: correctionDeparture,
+        })
+        .eq("id", reservationRoom.id);
+      if (roomError) {
+        await supabase.from("reservations").update({
+          arrival_date: reservation.arrival_date,
+          departure_date: reservation.departure_date,
+          subtotal: reservation.subtotal,
+          vat_amount: reservation.vat_amount,
+          total_amount: reservation.total_amount,
+        }).eq("id", reservation.id);
+        throw new Error(roomError.message);
+      }
+
+      await logReservationAction("stay_corrected", oldValues, {
+        arrival_date: correctionArrival,
+        departure_date: correctionDeparture,
+        room_id: correctionRoomId,
+        total_amount: newTotal,
+      }, correctionReason.trim());
+      setShowCorrectionModal(false);
+      await loadReservation(reservation.id);
+      setMessage(`Stay updated successfully. New total: ${money(newTotal)}.`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Could not update the stay.");
+    } finally {
+      setSavingCorrection(false);
+    }
+  }
+
+  async function reopenCheckout() {
+    if (!reservation || reservation.status !== "checked_out" || !["owner", "manager"].includes(currentStaffRole)) return;
+    const reason = window.prompt("Why is this checkout being reopened? This reason will be kept in the audit history.");
+    if (!reason?.trim()) {
+      if (reason !== null) alert("A reason is required.");
+      return;
+    }
+    if (!window.confirm(`Reopen ${reservation.reservation_number} as Checked In?`)) return;
+    setUpdating(true);
+    try {
+      const { error } = await supabase.from("reservations").update({
+        status: "checked_in",
+        checked_out_at: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", reservation.id);
+      if (error) throw new Error(error.message);
+      if (reservationRoom?.room_id) {
+        await supabase.from("rooms").update({ housekeeping_status: "clean" }).eq("id", reservationRoom.room_id);
+      }
+      await logReservationAction("checkout_reopened", { status: "checked_out" }, { status: "checked_in" }, reason.trim());
+      await loadReservation(reservation.id);
+      setMessage("Checkout reopened and the guest is back In House.");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Could not reopen checkout.");
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function reversePayment(payment: Payment) {
+    if (!reservation || !["owner", "manager"].includes(currentStaffRole)) return;
+    const reason = window.prompt("Enter the reason for reversing this transaction.");
+    if (!reason?.trim()) {
+      if (reason !== null) alert("A reversal reason is required.");
+      return;
+    }
+    if (!window.confirm(`Reverse ${money(payment.amount)} ${formatPaymentMethod(payment.payment_method)} transaction?`)) return;
+    try {
+      const marker = `Reversal of payment ${payment.id}`;
+      const { data: existing } = await supabase.from("payments").select("id").eq("reservation_id", reservation.id).ilike("notes", `%${marker}%`).limit(1);
+      if (existing?.length) throw new Error("This transaction has already been reversed.");
+      const tradingDayId = await getTradingDay(reservation.property_id);
+      const reversalType = payment.transaction_type === "refund" ? "payment" : "refund";
+      const { error } = await supabase.from("payments").insert({
+        property_id: reservation.property_id,
+        trading_day_id: tradingDayId,
+        reservation_id: reservation.id,
+        guest_id: reservation.guest_id,
+        company_id: reservation.company_id,
+        payment_reference: `REV-${payment.payment_reference || payment.id.slice(0, 8)}`,
+        payment_method: payment.payment_method,
+        transaction_type: reversalType,
+        amount: payment.amount,
+        notes: `${marker}. Reason: ${reason.trim()}`,
+        received_at: new Date().toISOString(),
+      });
+      if (error) throw new Error(error.message);
+      await logReservationAction("payment_reversed", { payment_id: payment.id }, { transaction_type: reversalType, amount: payment.amount }, reason.trim());
+      await loadPayments(reservation.id);
+      setMessage("Payment reversal recorded. The original transaction remains in history.");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Could not reverse payment.");
+    }
+  }
+
   // =========================================================
   // CANCEL
   // =========================================================
@@ -1420,9 +1649,29 @@ export default function ReservationDetailsPage() {
       return;
     }
 
+    const reason = window.prompt(
+      "Enter the cancellation reason. This is required and will remain in the reservation history."
+    );
+    if (!reason?.trim()) {
+      if (reason !== null) alert("A cancellation reason is required.");
+      return;
+    }
+
+    let depositTreatment = "No payment received";
+    if (totalPaid > 0) {
+      const treatment = window.prompt(
+        `Net payments received: ${money(totalPaid)}. Enter deposit treatment: REFUND, RETAIN or TRANSFER.`
+      )?.trim().toUpperCase();
+      if (!treatment || !["REFUND", "RETAIN", "TRANSFER"].includes(treatment)) {
+        alert("Enter REFUND, RETAIN or TRANSFER so the deposit is handled clearly.");
+        return;
+      }
+      depositTreatment = treatment;
+    }
+
     const confirmed =
       window.confirm(
-        `Cancel reservation ${reservation.reservation_number} for ${guestName()}?\n\nThe room will become available again on the calendar.`
+        `Cancel reservation ${reservation.reservation_number} for ${guestName()}?\n\nReason: ${reason.trim()}\nDeposit: ${depositTreatment}\n\nThe room will become available again on the calendar.`
       );
 
     if (!confirmed) {
@@ -1451,6 +1700,8 @@ export default function ReservationDetailsPage() {
 
           cancelled_trading_day_id:
             tradingDayId,
+
+          notes: `${reservation.notes ? `${reservation.notes}\n` : ""}Cancellation: ${reason.trim()}. Deposit treatment: ${depositTreatment}.`,
         })
         .eq(
           "id",
@@ -1462,6 +1713,13 @@ export default function ReservationDetailsPage() {
           error.message
         );
       }
+
+      await logReservationAction(
+        "reservation_cancelled",
+        { status: reservation.status, net_payments: totalPaid },
+        { status: "cancelled", deposit_treatment: depositTreatment },
+        reason.trim(),
+      );
 
       await loadReservation(
         reservation.id
@@ -1496,9 +1754,17 @@ export default function ReservationDetailsPage() {
       return;
     }
 
+    const reason = window.prompt(
+      "Enter the no-show reason or contact outcome. This is required for the history."
+    );
+    if (!reason?.trim()) {
+      if (reason !== null) alert("A no-show reason is required.");
+      return;
+    }
+
     const confirmed =
       window.confirm(
-        `Mark ${guestName()} as NO SHOW?\n\nReservation: ${reservation.reservation_number}\n\nThe reservation remains recorded, but the room will be released on the availability calendar.`
+        `Mark ${guestName()} as NO SHOW?\n\nReservation: ${reservation.reservation_number}\nReason: ${reason.trim()}\n\nThe reservation remains recorded, but the room will be released on the availability calendar.`
       );
 
     if (!confirmed) {
@@ -1516,6 +1782,8 @@ export default function ReservationDetailsPage() {
         .update({
           status:
             "no_show",
+
+          notes: `${reservation.notes ? `${reservation.notes}\n` : ""}No show: ${reason.trim()}.`,
         })
         .eq(
           "id",
@@ -1527,6 +1795,13 @@ export default function ReservationDetailsPage() {
           error.message
         );
       }
+
+      await logReservationAction(
+        "reservation_no_show",
+        { status: reservation.status },
+        { status: "no_show" },
+        reason.trim(),
+      );
 
       await loadReservation(
         reservation.id
@@ -2744,6 +3019,7 @@ ${body}
     [
       "provisional",
       "confirmed",
+      "checked_in",
     ].includes(
       reservation.status
     );
@@ -2808,14 +3084,10 @@ ${body}
             {canEdit && (
               <button
                 type="button"
-                onClick={() =>
-                  router.push(
-                    `/reservations/${reservation.id}/edit`
-                  )
-                }
+                onClick={openStayCorrection}
                 style={editButton}
               >
-                ✎ Edit Reservation
+                Change Room / Dates
               </button>
             )}
 
@@ -2852,6 +3124,18 @@ ${body}
                 Check Out
               </button>
             )}
+
+            {reservation.status === "checked_out" &&
+              ["owner", "manager"].includes(currentStaffRole) && (
+                <button
+                  type="button"
+                  onClick={reopenCheckout}
+                  disabled={updating}
+                  style={editButton}
+                >
+                  Reopen Checkout
+                </button>
+              )}
 
             {canNoShow && (
               <button
@@ -3526,6 +3810,16 @@ ${body}
                             payment.amount
                           )}
                         </strong>
+
+                        {["owner", "manager"].includes(currentStaffRole) && (
+                          <button
+                            type="button"
+                            onClick={() => void reversePayment(payment)}
+                            style={reverseButton}
+                          >
+                            Reverse
+                          </button>
+                        )}
                       </div>
                     ))
                   )}
@@ -3802,6 +4096,65 @@ ${body}
           </div>
         </div>
       </main>
+
+      {showCorrectionModal && (
+        <div style={modalOverlay}>
+          <form onSubmit={saveStayCorrection} style={{ ...modalBox, maxWidth: 560 }}>
+            <div style={modalHeader}>
+              <div>
+                <h2 style={modalTitle}>Change Room or Stay Dates</h2>
+                <div style={modalSubtitle}>
+                  {reservation.reservation_number} · availability will be checked before saving
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowCorrectionModal(false)} style={closeButton}>×</button>
+            </div>
+
+            <div style={modalGrid}>
+              <Field label="Check-in">
+                <input type="date" value={correctionArrival} onChange={(event) => setCorrectionArrival(event.target.value)} style={inputStyle} />
+              </Field>
+              <Field label="Check-out">
+                <input type="date" min={correctionArrival ? addDays(correctionArrival, 1) : undefined} value={correctionDeparture} onChange={(event) => setCorrectionDeparture(event.target.value)} style={inputStyle} />
+              </Field>
+            </div>
+
+            <Field label="Physical Room">
+              <select value={correctionRoomId} onChange={(event) => setCorrectionRoomId(event.target.value)} style={inputStyle}>
+                <option value="">Select room</option>
+                {availableRooms
+                  .filter((item) => item.room_type_id === reservationRoom?.room_type_id)
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      Room {item.room_number} · {formatHousekeeping(item.housekeeping_status)}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+
+            <Field label="Reason for Change">
+              <textarea
+                value={correctionReason}
+                onChange={(event) => setCorrectionReason(event.target.value)}
+                placeholder="Example: Guest extended stay by one night"
+                rows={3}
+                style={{ ...inputStyle, resize: "vertical" }}
+              />
+            </Field>
+
+            <div style={correctionNotice}>
+              The room must be available for the entire stay. Accommodation totals and VAT are recalculated automatically using the agreed nightly rate.
+            </div>
+
+            <div style={modalActions}>
+              <button type="button" onClick={() => setShowCorrectionModal(false)} style={secondaryButton}>Cancel</button>
+              <button type="submit" disabled={savingCorrection} style={primaryButton}>
+                {savingCorrection ? "Checking and Saving..." : "Save Change"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* PAYMENT MODAL */}
 
@@ -5127,6 +5480,27 @@ const modalActions: CSSProperties = {
   justifyContent: "flex-end",
   gap: 7,
   marginTop: 4,
+};
+
+const correctionNotice: CSSProperties = {
+  padding: "9px 10px",
+  border: "1px solid #B9CAD7",
+  borderRadius: 7,
+  background: "#F1F5F8",
+  color: "#40586B",
+  fontSize: 9,
+  lineHeight: 1.45,
+};
+
+const reverseButton: CSSProperties = {
+  border: "1px solid #C5AFA6",
+  borderRadius: 6,
+  padding: "5px 8px",
+  background: "#FFFFFF",
+  color: "#8A4029",
+  fontSize: 8,
+  fontWeight: 900,
+  cursor: "pointer",
 };
 
 const closeButton: CSSProperties = {
