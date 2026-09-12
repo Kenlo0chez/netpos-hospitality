@@ -615,6 +615,19 @@ export default function ReservationsPage() {
                 </div>
 
                 <div style={dateActions}>
+                  <label style={dateJumpControl}>
+                    <span style={dateJumpLabel}>Jump to</span>
+                    <input
+                      type="date"
+                      value={boardStartDate}
+                      onChange={(event) => {
+                        if (!event.target.value) return;
+                        setBoardStartDate(event.target.value);
+                        setDateSelection(null);
+                      }}
+                      style={dateJumpInput}
+                    />
+                  </label>
                   <div style={rangeToggle}>
                     {([7, 14, 30] as const).map((days) => (
                       <button
@@ -787,6 +800,34 @@ export default function ReservationsPage() {
                                 TODAY
                               </div>
                             )}
+                          </div>
+                        );
+                      })}
+
+                      <div style={availabilityLabelCell}>
+                        Availability
+                      </div>
+
+                      {boardDates.map((date) => {
+                        const available = Math.max(
+                          0,
+                          visibleRooms.length - countOccupiedRoomsForDate(
+                            visibleRooms,
+                            boardReservations,
+                            date,
+                          ),
+                        );
+
+                        return (
+                          <div
+                            key={`availability-${date}`}
+                            style={{
+                              ...availabilityCountCell,
+                              ...(date === today ? todayAvailabilityCell : {}),
+                            }}
+                            title={`${available} room${available === 1 ? "" : "s"} available`}
+                          >
+                            {available}
                           </div>
                         );
                       })}
@@ -1772,19 +1813,20 @@ const boardToolbar: React.CSSProperties = {
   justifyContent: "space-between",
   alignItems: "center",
   gap: 12,
-  border: `1px solid ${BORDER}`,
+  border: "1px solid #173F68",
   borderRadius: "10px 10px 0 0",
   padding: "7px 10px",
-  background: "linear-gradient(90deg,#F8FBFD 0%,#FFFFFF 100%)",
+  background: "linear-gradient(105deg,#102F50 0%,#194F7D 70%,#246A92 100%)",
+  boxShadow: "0 7px 18px rgba(8,31,52,.16)",
 };
 
 const boardTitle: React.CSSProperties = {
   fontSize: 11,
-  color: DARK_BLUE,
+  color: "#FFFFFF",
 };
 
 const boardSubtext: React.CSSProperties = {
-  color: MUTED,
+  color: "#C8DAE9",
   fontSize: 7.5,
   marginTop: 3,
 };
@@ -1795,13 +1837,42 @@ const dateActions: React.CSSProperties = {
   gap: 5,
 };
 
+const dateJumpControl: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 5,
+  padding: "3px 5px 3px 8px",
+  border: "1px solid rgba(255,255,255,.24)",
+  borderRadius: 7,
+  background: "rgba(255,255,255,.1)",
+};
+
+const dateJumpLabel: React.CSSProperties = {
+  color: "#D7E5F0",
+  fontSize: 6.5,
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: 0.35,
+};
+
+const dateJumpInput: React.CSSProperties = {
+  width: 108,
+  border: 0,
+  borderRadius: 5,
+  padding: "4px 6px",
+  background: "#FFFFFF",
+  color: "#173B5C",
+  fontSize: 7.5,
+  fontWeight: 800,
+};
+
 const rangeToggle: React.CSSProperties = {
   display: "flex",
   padding: 2,
   marginRight: 4,
-  border: "1px solid #C4CED7",
+  border: "1px solid rgba(255,255,255,.22)",
   borderRadius: 7,
-  background: "#E9EEF2",
+  background: "rgba(5,22,37,.24)",
 };
 
 const rangeButton: React.CSSProperties = {
@@ -1809,7 +1880,7 @@ const rangeButton: React.CSSProperties = {
   borderRadius: 5,
   padding: "5px 7px",
   background: "transparent",
-  color: "#526576",
+  color: "#D5E4EF",
   fontSize: 7,
   fontWeight: 900,
   cursor: "pointer",
@@ -1817,14 +1888,14 @@ const rangeButton: React.CSSProperties = {
 
 const activeRangeButton: React.CSSProperties = {
   background: "#FFFFFF",
-  color: BLUE,
+  color: "#123F68",
   boxShadow: "0 1px 4px rgba(8,32,52,.14)",
 };
 
 const dateButton: React.CSSProperties = {
-  border: "1px solid #C5D7E4",
-  background: "#FFFFFF",
-  color: BLUE,
+  border: "1px solid rgba(255,255,255,.28)",
+  background: "rgba(255,255,255,.1)",
+  color: "#FFFFFF",
   borderRadius: 6,
   padding: "6px 8px",
   fontSize: 7.5,
@@ -1834,9 +1905,9 @@ const dateButton: React.CSSProperties = {
 
 const todayButton: React.CSSProperties = {
   ...dateButton,
-  background: BLUE,
-  color: "#FFFFFF",
-  borderColor: BLUE,
+  background: "#FFFFFF",
+  color: "#123F68",
+  borderColor: "#FFFFFF",
 };
 
 const selectionInstruction: React.CSSProperties = {
@@ -1976,7 +2047,7 @@ const dateHeaderCell: React.CSSProperties = {
   flexDirection: "column",
   justifyContent: "center",
   alignItems: "center",
-  background: "#F4F8FB",
+  background: "#EDF1F4",
   borderRight: "1px solid #DCE6EE",
   borderBottom: "1px solid #C8D9E6",
   color: TEXT,
@@ -1984,12 +2055,12 @@ const dateHeaderCell: React.CSSProperties = {
 };
 
 const todayHeaderCell: React.CSSProperties = {
-  background: "#E3F1FC",
+  background: "#D8E9F6",
   color: DARK_BLUE,
 };
 
 const weekendHeaderCell: React.CSSProperties = {
-  background: "#E9EDF1",
+  background: "#E3E7EB",
   color: "#314454",
 };
 
@@ -2004,6 +2075,42 @@ const todayText: React.CSSProperties = {
   fontSize: 5.5,
   fontWeight: 900,
   marginTop: 2,
+};
+
+const availabilityLabelCell: React.CSSProperties = {
+  position: "sticky",
+  left: 0,
+  zIndex: 4,
+  minHeight: 25,
+  display: "flex",
+  alignItems: "center",
+  padding: "3px 9px",
+  borderRight: "1px solid #BBD0DE",
+  borderBottom: "1px solid #BBD0DE",
+  background: "#E3EDF4",
+  color: "#345670",
+  fontSize: 6.5,
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: 0.4,
+};
+
+const availabilityCountCell: React.CSSProperties = {
+  minHeight: 25,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRight: "1px solid #D6E2E9",
+  borderBottom: "1px solid #BBD0DE",
+  background: "#E9F5F1",
+  color: "#117358",
+  fontSize: 8,
+  fontWeight: 900,
+};
+
+const todayAvailabilityCell: React.CSSProperties = {
+  background: "#CFE9E1",
+  color: "#075E48",
 };
 
 const roomNameCell: React.CSSProperties = {
@@ -2109,7 +2216,7 @@ const availablePlus: React.CSSProperties = {
 const bookingCell: React.CSSProperties = {
   minHeight: 42,
   border: 0,
-  borderRight: "1px solid rgba(0,0,0,.06)",
+  borderRight: "1px solid rgba(255,255,255,.32)",
   borderBottom: "1px solid #E8EEF3",
   padding: "5px 6px",
   cursor: "pointer",
@@ -2137,21 +2244,21 @@ const continuationMark: React.CSSProperties = {
 };
 
 const confirmedCell: React.CSSProperties = {
-  background: "#E8F3FC",
-  color: "#0D5FA8",
-  borderColor: "#B9D5EA",
+  background: "#BFE7DB",
+  color: "#115E4D",
+  borderColor: "#8CCBB8",
 };
 
 const checkedInCell: React.CSSProperties = {
-  background: "#EAF8F1",
-  color: "#14714C",
-  borderColor: "#B8DDCA",
+  background: "#B9E1F2",
+  color: "#0A587B",
+  borderColor: "#80C4DF",
 };
 
 const provisionalCell: React.CSSProperties = {
-  background: "#F1F5F8",
-  color: "#5E7385",
-  borderColor: "#CEDAE3",
+  background: "#DCD8F3",
+  color: "#554A8A",
+  borderColor: "#B9B1DF",
 };
 
 const availableLegend: React.CSSProperties = {
