@@ -26,6 +26,22 @@ create table expense_categories (
     unique(property_id, name)
 );
 
+insert into expense_categories (property_id, name, account_code)
+select property.id, category.name, category.account_code
+from properties property
+cross join (values
+    ('Cleaning Supplies', 'EXP-CLEAN'),
+    ('Electricity and Water', 'EXP-UTIL'),
+    ('Food and Beverages', 'EXP-FNB'),
+    ('Laundry', 'EXP-LAUNDRY'),
+    ('Maintenance and Repairs', 'EXP-MAINT'),
+    ('Office and Administration', 'EXP-ADMIN'),
+    ('Staff Costs', 'EXP-STAFF'),
+    ('Transport', 'EXP-TRANS'),
+    ('Other Expenses', 'EXP-OTHER')
+) as category(name, account_code)
+on conflict (property_id, name) do nothing;
+
 create table expenses (
     id uuid primary key default gen_random_uuid(),
     property_id uuid not null references properties(id),
@@ -118,3 +134,27 @@ create index idx_expenses_property_date on expenses(property_id, expense_date);
 create index idx_payment_allocations_invoice on payment_allocations(invoice_id);
 create index idx_statement_lines_match on bank_statement_lines(bank_account_id, match_status, transaction_date);
 create index idx_reconciliations_period on bank_reconciliations(bank_account_id, period_end);
+
+-- Finance data must never be exposed to unauthenticated API requests.
+alter table bank_accounts enable row level security;
+alter table expense_categories enable row level security;
+alter table expenses enable row level security;
+alter table payment_allocations enable row level security;
+alter table bank_statement_imports enable row level security;
+alter table bank_statement_lines enable row level security;
+alter table bank_reconciliations enable row level security;
+
+create policy "Authenticated staff manage bank accounts" on bank_accounts
+    for all to authenticated using (true) with check (true);
+create policy "Authenticated staff manage expense categories" on expense_categories
+    for all to authenticated using (true) with check (true);
+create policy "Authenticated staff manage expenses" on expenses
+    for all to authenticated using (true) with check (true);
+create policy "Authenticated staff manage payment allocations" on payment_allocations
+    for all to authenticated using (true) with check (true);
+create policy "Authenticated staff manage statement imports" on bank_statement_imports
+    for all to authenticated using (true) with check (true);
+create policy "Authenticated staff manage statement lines" on bank_statement_lines
+    for all to authenticated using (true) with check (true);
+create policy "Authenticated staff manage reconciliations" on bank_reconciliations
+    for all to authenticated using (true) with check (true);
