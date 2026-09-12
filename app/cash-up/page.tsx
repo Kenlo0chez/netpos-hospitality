@@ -1006,6 +1006,42 @@ export default function XReportPage() {
       return;
     }
 
+    const [arrivalCheck, departureCheck, roomCheck] = await Promise.all([
+      supabase
+        .from("reservations")
+        .select("id", { count: "exact", head: true })
+        .eq("property_id", propertyId)
+        .in("status", ["provisional", "confirmed"])
+        .lte("arrival_date", currentDay.business_date),
+      supabase
+        .from("reservations")
+        .select("id", { count: "exact", head: true })
+        .eq("property_id", propertyId)
+        .eq("status", "checked_in")
+        .lte("departure_date", currentDay.business_date),
+      supabase
+        .from("rooms")
+        .select("id", { count: "exact", head: true })
+        .eq("property_id", propertyId)
+        .eq("housekeeping_status", "dirty"),
+    ]);
+
+    const exceptions = [
+      arrivalCheck.count ? `${arrivalCheck.count} unresolved arrival(s)` : "",
+      departureCheck.count ? `${departureCheck.count} overdue departure(s)` : "",
+      roomCheck.count ? `${roomCheck.count} dirty room(s)` : "",
+    ].filter(Boolean);
+
+    if (exceptions.length) {
+      const staff = JSON.parse(sessionStorage.getItem("netpos_staff") ?? "null") as { role?: string } | null;
+      if (!staff || !["owner", "manager"].includes(staff.role ?? "")) {
+        alert(`End of Day is blocked until a manager resolves:\n\n${exceptions.join("\n")}`);
+        return;
+      }
+      const override = window.confirm(`Daily exceptions remain:\n\n${exceptions.join("\n")}\n\nManager override: continue closing the day?`);
+      if (!override) return;
+    }
+
     const confirmed =
       window.confirm(
         `End business day ${formatDate(
