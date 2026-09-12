@@ -1043,9 +1043,54 @@ export default function ReservationDetailsPage() {
       return;
     }
 
+    if (
+      ["eft", "card"].includes(paymentMethod) &&
+      !paymentReference.trim()
+    ) {
+      alert("Enter the bank or card reference before saving this payment.");
+      return;
+    }
+
+    if (
+      transactionType !== "refund" &&
+      amount > balanceOutstanding + 0.009
+    ) {
+      alert(
+        `This payment is more than the outstanding balance of N$${balanceOutstanding.toFixed(2)}. Correct the amount or record the excess separately.`
+      );
+      return;
+    }
+
+    if (
+      transactionType === "refund" &&
+      amount > totalPaid + 0.009
+    ) {
+      alert(
+        `The refund cannot exceed the net amount received of N$${totalPaid.toFixed(2)}.`
+      );
+      return;
+    }
+
     setSavingPayment(true);
 
     try {
+      if (paymentReference.trim()) {
+        const { data: duplicate } = await supabase
+          .from("payments")
+          .select("id")
+          .eq("reservation_id", reservation.id)
+          .eq("payment_method", paymentMethod)
+          .eq("transaction_type", transactionType)
+          .eq("payment_reference", paymentReference.trim())
+          .eq("amount", amount)
+          .limit(1)
+          .maybeSingle();
+
+        if (duplicate) {
+          throw new Error("This payment reference and amount were already recorded for this reservation.");
+        }
+      }
+
       const tradingDayId =
         await getTradingDay(
           reservation.property_id
@@ -1131,6 +1176,21 @@ export default function ReservationDetailsPage() {
       reservation.status !==
         "confirmed"
     ) {
+      return;
+    }
+
+    if (!reservationRoom?.room_id || !room) {
+      alert("Assign a physical room before checking in this guest.");
+      return;
+    }
+
+    if (room.operational_status !== "active") {
+      alert(`Room ${room.room_number} is out of service. Move the reservation to an active room before check-in.`);
+      return;
+    }
+
+    if (room.housekeeping_status !== "clean") {
+      alert(`Room ${room.room_number} is ${room.housekeeping_status || "not ready"}. Housekeeping must mark it Clean before check-in.`);
       return;
     }
 
