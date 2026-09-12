@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { supabase } from "@/src/lib/supabase";
+import { selectInitialProperty } from "@/src/lib/propertyScope";
 
 type Property = { id: string; name: string };
 type Payment = { id: string; reservation_id: string | null; payment_reference: string | null; amount: number; received_at: string };
@@ -52,10 +53,8 @@ export default function EftAllocationPage() {
   const initialise = useCallback(async () => {
     const { data, error } = await supabase.from("properties").select("id,name").eq("is_active", true).order("name");
     if (error) { setErrorMessage(error.message); setLoading(false); return; }
-    const rows = (data as Property[]) ?? [];
-    const assigned = sessionStorage.getItem("netpos_property_id");
-    const selected = rows.some((property) => property.id === assigned) ? assigned! : rows[0]?.id ?? "";
-    setProperties(rows);
+    const { scoped, selected } = selectInitialProperty((data as Property[]) ?? []);
+    setProperties(scoped);
     setPropertyId(selected);
     if (selected) await loadData(selected); else setLoading(false);
   }, [loadData]);
