@@ -25,6 +25,11 @@ type TradingDay = {
   business_date: string;
   status: string;
   closed_at: string | null;
+  opening_float: number;
+  expected_cash: number | null;
+  counted_cash: number | null;
+  cash_variance: number | null;
+  closing_notes: string | null;
 };
 
 type Payment = {
@@ -113,6 +118,12 @@ export default function XReportPage() {
   const [message, setMessage] =
     useState("");
 
+  const [countedCash, setCountedCash] =
+    useState("");
+
+  const [closingNotes, setClosingNotes] =
+    useState("");
+
   // =========================================================
   // INITIAL LOAD
   // =========================================================
@@ -198,7 +209,12 @@ export default function XReportPage() {
           property_id,
           business_date,
           status,
-          closed_at
+          closed_at,
+          opening_float,
+          expected_cash,
+          counted_cash,
+          cash_variance,
+          closing_notes
         `)
         .eq(
           "property_id",
@@ -228,6 +244,8 @@ export default function XReportPage() {
       }
 
       setCurrentDay(openDay);
+      setCountedCash(openDay.counted_cash == null ? "" : String(openDay.counted_cash));
+      setClosingNotes(openDay.closing_notes ?? "");
 
       const {
         data: historyData,
@@ -239,7 +257,12 @@ export default function XReportPage() {
           property_id,
           business_date,
           status,
-          closed_at
+          closed_at,
+          opening_float,
+          expected_cash,
+          counted_cash,
+          cash_variance,
+          closing_notes
         `)
         .eq(
           "property_id",
@@ -290,9 +313,14 @@ export default function XReportPage() {
       .select(`
         id,
         property_id,
-        business_date,
-        status,
-        closed_at
+          business_date,
+          status,
+          closed_at,
+          opening_float,
+          expected_cash,
+          counted_cash,
+          cash_variance,
+          closing_notes
       `)
       .eq(
         "property_id",
@@ -332,13 +360,19 @@ export default function XReportPage() {
         business_date:
           nextBusinessDate,
         status: "open",
+        opening_float: 0,
       })
       .select(`
         id,
         property_id,
         business_date,
         status,
-        closed_at
+        closed_at,
+        opening_float,
+        expected_cash,
+        counted_cash,
+        cash_variance,
+        closing_notes
       `)
       .single();
 
@@ -646,6 +680,17 @@ export default function XReportPage() {
     selectedReportDay?.status ===
     "closed";
 
+  const expectedDrawerCash =
+    Number(selectedReportDay?.opening_float ?? 0) + cashTotal;
+
+  const enteredCountedCash =
+    countedCash.trim() === "" ? null : Number(countedCash);
+
+  const currentCashVariance =
+    enteredCountedCash == null || Number.isNaN(enteredCountedCash)
+      ? null
+      : enteredCountedCash - expectedDrawerCash;
+
   // =========================================================
   // HISTORY
   // =========================================================
@@ -654,6 +699,8 @@ export default function XReportPage() {
     day: TradingDay
   ) {
     setSelectedReportDay(day);
+    setCountedCash(day.counted_cash == null ? "" : String(day.counted_cash));
+    setClosingNotes(day.closing_notes ?? "");
     setMessage("");
 
     await loadReportData(
@@ -670,6 +717,8 @@ export default function XReportPage() {
     setSelectedReportDay(
       currentDay
     );
+    setCountedCash(currentDay.counted_cash == null ? "" : String(currentDay.counted_cash));
+    setClosingNotes(currentDay.closing_notes ?? "");
 
     await loadReportData(
       propertyId,
@@ -905,6 +954,24 @@ export default function XReportPage() {
                 netTotal
               )}</div>
             </div>
+            <div class="box">
+              <div class="label">EXPECTED DRAWER</div>
+              <div class="value">${money(
+                Number(selectedReportDay.expected_cash ?? expectedDrawerCash)
+              )}</div>
+            </div>
+            <div class="box">
+              <div class="label">CASH COUNTED</div>
+              <div class="value">${selectedReportDay.counted_cash == null ? "Not counted" : money(Number(selectedReportDay.counted_cash))}</div>
+            </div>
+            <div class="box">
+              <div class="label">CASH VARIANCE</div>
+              <div class="value">${selectedReportDay.cash_variance == null ? "—" : money(Number(selectedReportDay.cash_variance))}</div>
+            </div>
+          </div>
+
+          <div class="muted">
+            Closing note: ${escapeHtml(selectedReportDay.closing_notes || "None")}
           </div>
 
           <h2>Transactions</h2>
@@ -1006,7 +1073,17 @@ export default function XReportPage() {
       return;
     }
 
-    const [arrivalCheck, departureCheck, roomCheck] = await Promise.all([
+    if (enteredCountedCash == null || Number.isNaN(enteredCountedCash) || enteredCountedCash < 0) {
+      alert("Enter the physical cash counted in the drawer before completing End of Day.");
+      return;
+    }
+
+    if (Math.abs(currentCashVariance ?? 0) > 0.009 && !closingNotes.trim()) {
+      alert("Cash does not balance. Enter a closing note explaining the shortage or overage before End of Day.");
+      return;
+    }
+
+    const [arrivalCheck, departureCheck, roomCheck, balanceCheck] = await Promise.all([
       supabase
         .from("reservations")
         .select("id", { count: "exact", head: true })
@@ -1024,12 +1101,36 @@ export default function XReportPage() {
         .select("id", { count: "exact", head: true })
         .eq("property_id", propertyId)
         .eq("housekeeping_status", "dirty"),
+      supabase
+        .from("reservations")
+        .select("id,total_amount,payments(amount,transaction_type)")
+        .eq("property_id", propertyId)
+        .eq("status", "checked_in"),
     ]);
+
+    const checkError =
+      arrivalCheck.error ?? departureCheck.error ?? roomCheck.error ?? balanceCheck.error;
+    if (checkError) {
+      alert(`End-of-Day controls could not be verified: ${checkError.message}`);
+      return;
+    }
+
+    const unpaidInHouse = ((balanceCheck.data as unknown as Array<{
+      total_amount: number;
+      payments: Array<{ amount: number; transaction_type: string }> | null;
+    }>) ?? []).filter((stay) => {
+      const paid = (stay.payments ?? []).reduce(
+        (total, payment) => total + (payment.transaction_type === "refund" ? -Number(payment.amount) : Number(payment.amount)),
+        0,
+      );
+      return Number(stay.total_amount) - paid > 0.009;
+    }).length;
 
     const exceptions = [
       arrivalCheck.count ? `${arrivalCheck.count} unresolved arrival(s)` : "",
       departureCheck.count ? `${departureCheck.count} overdue departure(s)` : "",
       roomCheck.count ? `${roomCheck.count} dirty room(s)` : "",
+      unpaidInHouse ? `${unpaidInHouse} in-house account(s) with an outstanding balance` : "",
     ].filter(Boolean);
 
     if (exceptions.length) {
@@ -1065,6 +1166,10 @@ export default function XReportPage() {
           status: "closed",
           closed_at:
             new Date().toISOString(),
+          expected_cash: expectedDrawerCash,
+          counted_cash: enteredCountedCash,
+          cash_variance: currentCashVariance,
+          closing_notes: closingNotes.trim() || null,
         })
         .eq("id", currentDay.id);
 
@@ -1263,6 +1368,69 @@ export default function XReportPage() {
           value={money(netTotal)}
           tone="green"
         />
+      </section>
+
+      <section style={cashControlCard}>
+        <div style={cashControlHeading}>
+          <div>
+            <strong style={cashControlTitle}>Cash-up control</strong>
+            <div style={cashControlHelp}>
+              Count the drawer only after all cash payments and refunds have been captured.
+            </div>
+          </div>
+          <span style={isHistoric ? closedBadge : openBadge}>
+            {isHistoric ? "CLOSED" : currentCashVariance == null ? "COUNT REQUIRED" : Math.abs(currentCashVariance) < 0.01 ? "BALANCED" : "VARIANCE"}
+          </span>
+        </div>
+
+        <div style={cashControlGrid}>
+          <div style={cashMetric}>
+            <span style={cashMetricLabel}>Opening float</span>
+            <strong>{money(Number(selectedReportDay?.opening_float ?? 0))}</strong>
+          </div>
+          <div style={cashMetric}>
+            <span style={cashMetricLabel}>Cash activity</span>
+            <strong>{money(cashTotal)}</strong>
+          </div>
+          <div style={cashMetric}>
+            <span style={cashMetricLabel}>Expected drawer</span>
+            <strong>{money(isHistoric ? Number(selectedReportDay?.expected_cash ?? 0) : expectedDrawerCash)}</strong>
+          </div>
+          <label style={cashField}>
+            <span style={cashMetricLabel}>Physical cash counted</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={countedCash}
+              onChange={(event) => setCountedCash(event.target.value)}
+              disabled={isHistoric}
+              placeholder="0.00"
+              style={cashInput}
+            />
+          </label>
+          <div style={{
+            ...cashMetric,
+            ...(Number(isHistoric ? selectedReportDay?.cash_variance ?? 0 : currentCashVariance ?? 0) < -0.009
+              ? cashShort
+              : Number(isHistoric ? selectedReportDay?.cash_variance ?? 0 : currentCashVariance ?? 0) > 0.009
+              ? cashOver
+              : cashBalanced),
+          }}>
+            <span style={cashMetricLabel}>Variance</span>
+            <strong>{currentCashVariance == null && !isHistoric ? "—" : money(Number(isHistoric ? selectedReportDay?.cash_variance ?? 0 : currentCashVariance ?? 0))}</strong>
+          </div>
+          <label style={cashNotesField}>
+            <span style={cashMetricLabel}>Closing note {Math.abs(currentCashVariance ?? 0) > 0.009 ? "(required)" : ""}</span>
+            <input
+              value={closingNotes}
+              onChange={(event) => setClosingNotes(event.target.value)}
+              disabled={isHistoric}
+              placeholder="Explain a shortage, overage or manager override"
+              style={cashInput}
+            />
+          </label>
+        </div>
       </section>
 
       {/* ===================================================
@@ -2103,6 +2271,102 @@ const summaryGrid: CSSProperties = {
     "repeat(5,minmax(0,1fr))",
   gap: 8,
   marginBottom: 8,
+};
+
+const cashControlCard: CSSProperties = {
+  marginBottom: 8,
+  padding: "9px 11px",
+  border: "1px solid #C9D9E6",
+  borderRadius: 9,
+  background: "#FFFFFF",
+  boxShadow: "0 3px 12px rgba(13,63,122,.05)",
+};
+
+const cashControlHeading: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12,
+  marginBottom: 7,
+};
+
+const cashControlTitle: CSSProperties = {
+  color: DARK_BLUE,
+  fontSize: 11,
+};
+
+const cashControlHelp: CSSProperties = {
+  marginTop: 2,
+  color: MUTED,
+  fontSize: 7.5,
+};
+
+const cashControlGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(5,minmax(105px,1fr)) minmax(220px,1.8fr)",
+  gap: 6,
+  alignItems: "stretch",
+};
+
+const cashMetric: CSSProperties = {
+  minHeight: 45,
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+  gap: 4,
+  padding: "6px 8px",
+  border: "1px solid #DCE6ED",
+  borderRadius: 7,
+  background: "#F8FAFC",
+  color: "#173F61",
+  fontSize: 10,
+};
+
+const cashMetricLabel: CSSProperties = {
+  color: "#6B7D8D",
+  fontSize: 6.5,
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: 0.3,
+};
+
+const cashField: CSSProperties = {
+  ...cashMetric,
+};
+
+const cashNotesField: CSSProperties = {
+  ...cashMetric,
+};
+
+const cashInput: CSSProperties = {
+  width: "100%",
+  minWidth: 0,
+  boxSizing: "border-box",
+  border: "1px solid #BFD0DE",
+  borderRadius: 5,
+  padding: "5px 6px",
+  background: "#FFFFFF",
+  color: "#173F61",
+  fontSize: 8,
+  fontWeight: 700,
+};
+
+const cashBalanced: CSSProperties = {
+  borderColor: "#A9D4BE",
+  background: "#EDF8F2",
+  color: "#126B48",
+};
+
+const cashShort: CSSProperties = {
+  borderColor: "#E2ACAC",
+  background: "#FFF0F0",
+  color: "#A32626",
+};
+
+const cashOver: CSSProperties = {
+  borderColor: "#E4C789",
+  background: "#FFF8E8",
+  color: "#805B0C",
 };
 
 const summaryCard: CSSProperties = {
