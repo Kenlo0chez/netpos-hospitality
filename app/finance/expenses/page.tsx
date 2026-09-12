@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import Link from "next/link";
 import { supabase } from "@/src/lib/supabase";
+import { selectInitialProperty } from "@/src/lib/propertyScope";
 
 type Property = { id: string; name: string; vat_rate: number };
 type Category = { id: string; name: string };
@@ -15,7 +16,7 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [setupRequired, setSetupRequired] = useState(false); const [errorMessage, setErrorMessage] = useState(""); const [message, setMessage] = useState("");
 
   const loadExpenses = useCallback(async (selected: string) => { setLoading(true); setErrorMessage(""); setSetupRequired(false); const [c, e] = await Promise.all([supabase.from("expense_categories").select("id,name").eq("property_id", selected).eq("is_active", true).order("name"), supabase.from("expenses").select("id,expense_date,supplier_name,reference,description,payment_method,subtotal,vat_amount,total_amount,status").eq("property_id", selected).neq("status", "reversed").order("expense_date", { ascending: false }).limit(100)]); if (c.error || e.error) { setSetupRequired(true); setErrorMessage(c.error?.message ?? e.error?.message ?? "Finance setup required."); } else { setCategories((c.data as Category[]) ?? []); setExpenses((e.data as Expense[]) ?? []); } setLoading(false); }, []);
-  const initialise = useCallback(async () => { const { data, error } = await supabase.from("properties").select("id,name,vat_rate").eq("is_active", true).order("name"); if (error) { setErrorMessage(error.message); setLoading(false); return; } const rows = (data as Property[]) ?? []; const assigned = sessionStorage.getItem("netpos_property_id"); const selected = rows.some((p) => p.id === assigned) ? assigned! : rows[0]?.id ?? ""; setProperties(rows); setPropertyId(selected); if (selected) await loadExpenses(selected); }, [loadExpenses]);
+  const initialise = useCallback(async () => { const { data, error } = await supabase.from("properties").select("id,name,vat_rate").eq("is_active", true).order("name"); if (error) { setErrorMessage(error.message); setLoading(false); return; } const { scoped, selected } = selectInitialProperty((data as Property[]) ?? []); setProperties(scoped); setPropertyId(selected); if (selected) await loadExpenses(selected); }, [loadExpenses]);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void initialise();
