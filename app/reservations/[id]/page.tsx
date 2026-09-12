@@ -1166,6 +1166,18 @@ export default function ReservationDetailsPage() {
         );
       }
 
+      await logReservationAction(
+        transactionType === "refund" ? "refund_recorded" : "payment_recorded",
+        {},
+        {
+          payment_method: paymentMethod,
+          transaction_type: transactionType,
+          amount,
+          reference: paymentReference.trim() || null,
+        },
+        paymentNotes.trim() || "Payment captured from guest folio",
+      );
+
       setShowPaymentModal(false);
 
       setPaymentAmount("");
@@ -1218,6 +1230,30 @@ export default function ReservationDetailsPage() {
       return;
     }
 
+    const { data: possibleConflicts, error: conflictError } = await supabase
+      .from("reservation_rooms")
+      .select("reservation_id,reservations(status)")
+      .eq("room_id", reservationRoom.room_id)
+      .neq("reservation_id", reservation.id)
+      .lt("arrival_date", reservation.departure_date)
+      .gt("departure_date", reservation.arrival_date);
+
+    if (conflictError) {
+      alert(`Room availability could not be confirmed: ${conflictError.message}`);
+      return;
+    }
+
+    const hasConflict = ((possibleConflicts as unknown as Array<{
+      reservations: { status: string } | null;
+    }>) ?? []).some(
+      (item) => item.reservations && ["provisional", "confirmed", "checked_in"].includes(item.reservations.status),
+    );
+
+    if (hasConflict) {
+      alert(`Room ${room.room_number} now has another active reservation for these dates. Move this guest to an available room before check-in.`);
+      return;
+    }
+
     const confirmed =
       window.confirm(
         `Check in ${guestName()}?`
@@ -1252,6 +1288,13 @@ export default function ReservationDetailsPage() {
           error.message
         );
       }
+
+      await logReservationAction(
+        "guest_checked_in",
+        { status: "confirmed" },
+        { status: "checked_in", room_id: reservationRoom.room_id },
+        "Front desk check-in",
+      );
 
       await loadReservation(
         reservation.id
@@ -1290,6 +1333,13 @@ export default function ReservationDetailsPage() {
     if (
       balanceOutstanding > 0
     ) {
+      if (!["owner", "manager"].includes(currentStaffRole)) {
+        alert(
+          `Checkout is blocked because ${money(balanceOutstanding)} is still outstanding. A manager must settle the account or authorise the checkout.`
+        );
+        return;
+      }
+
       const continueCheckout =
         window.confirm(
           `The reservation still has a balance of N$${balanceOutstanding.toFixed(
@@ -1395,6 +1445,15 @@ export default function ReservationDetailsPage() {
           );
         }
       }
+
+      await logReservationAction(
+        "guest_checked_out",
+        { status: "checked_in", balance_outstanding: balanceOutstanding },
+        { status: "checked_out", room_status: "dirty" },
+        balanceOutstanding > 0
+          ? `Manager-authorised checkout with ${money(balanceOutstanding)} outstanding`
+          : "Front desk checkout",
+      );
 
       // -----------------------------------------------------
       // 3. RELOAD
@@ -1548,6 +1607,32 @@ export default function ReservationDetailsPage() {
         throw new Error(roomError.message);
       }
 
+      if (
+        reservation.status === "checked_in" &&
+        correctionRoomId !== reservationRoom.room_id &&
+        reservationRoom.room_id
+      ) {
+        const { error: oldRoomError } = await supabase
+          .from("rooms")
+          .update({ housekeeping_status: "dirty" })
+          .eq("id", reservationRoom.room_id);
+        if (oldRoomError) {
+          await supabase.from("reservation_rooms").update({
+            room_id: reservationRoom.room_id,
+            arrival_date: reservation.arrival_date,
+            departure_date: reservation.departure_date,
+          }).eq("id", reservationRoom.id);
+          await supabase.from("reservations").update({
+            arrival_date: reservation.arrival_date,
+            departure_date: reservation.departure_date,
+            subtotal: reservation.subtotal,
+            vat_amount: reservation.vat_amount,
+            total_amount: reservation.total_amount,
+          }).eq("id", reservation.id);
+          throw new Error(`The guest was not moved because the old room could not be released to housekeeping: ${oldRoomError.message}`);
+        }
+      }
+
       await logReservationAction("stay_corrected", oldValues, {
         arrival_date: correctionArrival,
         departure_date: correctionDeparture,
@@ -1574,14 +1659,45 @@ export default function ReservationDetailsPage() {
     if (!window.confirm(`Reopen ${reservation.reservation_number} as Checked In?`)) return;
     setUpdating(true);
     try {
+      if (!reservationRoom?.room_id) {
+        throw new Error("This checkout cannot be reopened until a physical room is assigned.");
+      }
+      const targetRoom = availableRooms.find((item) => item.id === reservationRoom.room_id);
+      if (!targetRoom || targetRoom.operational_status !== "active") {
+        throw new Error("The original room is out of service. Assign an active room before reopening this stay.");
+      }
+      const { data: possibleConflicts, error: conflictError } = await supabase
+        .from("reservation_rooms")
+        .select("reservation_id,reservations(status)")
+        .eq("room_id", reservationRoom.room_id)
+        .neq("reservation_id", reservation.id)
+        .lt("arrival_date", reservation.departure_date)
+        .gt("departure_date", reservation.arrival_date);
+      if (conflictError) throw new Error(conflictError.message);
+      const hasConflict = ((possibleConflicts as unknown as Array<{
+        reservations: { status: string } | null;
+      }>) ?? []).some(
+        (item) => item.reservations && ["provisional", "confirmed", "checked_in"].includes(item.reservations.status),
+      );
+      if (hasConflict) {
+        throw new Error(`Room ${targetRoom.room_number} has already been allocated to another active reservation. The checkout cannot be reopened.`);
+      }
       const { error } = await supabase.from("reservations").update({
         status: "checked_in",
         checked_out_at: null,
         updated_at: new Date().toISOString(),
       }).eq("id", reservation.id);
       if (error) throw new Error(error.message);
-      if (reservationRoom?.room_id) {
-        await supabase.from("rooms").update({ housekeeping_status: "clean" }).eq("id", reservationRoom.room_id);
+      const { error: roomError } = await supabase
+        .from("rooms")
+        .update({ housekeeping_status: "clean" })
+        .eq("id", reservationRoom.room_id);
+      if (roomError) {
+        await supabase.from("reservations").update({
+          status: "checked_out",
+          checked_out_at: reservation.checked_out_at,
+        }).eq("id", reservation.id);
+        throw new Error(`The checkout was not reopened because the room status could not be restored: ${roomError.message}`);
       }
       await logReservationAction("checkout_reopened", { status: "checked_out" }, { status: "checked_in" }, reason.trim());
       await loadReservation(reservation.id);
