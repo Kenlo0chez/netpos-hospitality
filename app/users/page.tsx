@@ -10,6 +10,7 @@ import {
 
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
+import { selectInitialProperty } from "@/src/lib/propertyScope";
 
 // =========================================================
 // TYPES
@@ -178,6 +179,9 @@ export default function UsersPermissionsPage() {
   const [propertyId, setPropertyId] =
     useState("");
 
+  const [currentRole, setCurrentRole] =
+    useState<Role>("owner");
+
   const [users, setUsers] =
     useState<StaffUser[]>([]);
 
@@ -231,6 +235,7 @@ export default function UsersPermissionsPage() {
   // =========================================================
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
     initialise();
   }, []);
 
@@ -251,19 +256,22 @@ export default function UsersPermissionsPage() {
         throw new Error(error.message);
       }
 
-      const rows =
-        (data as Property[]) ?? [];
+      const staff = JSON.parse(
+        sessionStorage.getItem("netpos_staff") ?? "null"
+      ) as { role?: Role } | null;
+      const staffRole = staff?.role ?? "owner";
+      const { scoped: rows, selected: firstPropertyId } =
+        selectInitialProperty((data as Property[]) ?? []);
 
       setProperties(rows);
-
-      const firstPropertyId =
-        rows[0]?.id ?? "";
-
+      setCurrentRole(staffRole);
       setPropertyId(firstPropertyId);
+      setSelectedRole(staffRole === "manager" ? "reception" : "owner");
 
       if (firstPropertyId) {
         await loadAccessControl(
-          firstPropertyId
+          firstPropertyId,
+          staffRole
         );
       }
     } catch (error) {
@@ -284,7 +292,7 @@ export default function UsersPermissionsPage() {
     setMessage("");
     setErrorMessage("");
 
-    await loadAccessControl(value);
+    await loadAccessControl(value, currentRole);
   }
 
   // =========================================================
@@ -292,7 +300,8 @@ export default function UsersPermissionsPage() {
   // =========================================================
 
   async function loadAccessControl(
-    selectedPropertyId: string
+    selectedPropertyId: string,
+    callerRole: Role = currentRole
   ) {
     if (!selectedPropertyId) {
       return;
@@ -302,11 +311,7 @@ export default function UsersPermissionsPage() {
     setErrorMessage("");
 
     try {
-      const [
-        usersResult,
-        permissionsResult,
-      ] = await Promise.all([
-        supabase
+      let usersQuery = supabase
           .from("staff_users")
           .select(`
             id,
@@ -319,11 +324,13 @@ export default function UsersPermissionsPage() {
             is_active,
             created_at,
             updated_at
-          `)
-          .or(
-            `property_id.eq.${selectedPropertyId},role.eq.owner`
-          )
-          .order("full_name"),
+          `);
+      usersQuery = callerRole === "owner"
+        ? usersQuery.or(`property_id.eq.${selectedPropertyId},role.eq.owner`)
+        : usersQuery.eq("property_id", selectedPropertyId).in("role", ["reception", "housekeeping"]);
+
+      const [usersResult, permissionsResult] = await Promise.all([
+        usersQuery.order("full_name"),
 
         supabase
           .from("role_permissions")
@@ -453,6 +460,10 @@ export default function UsersPermissionsPage() {
   function openEditUser(
     user: StaffUser
   ) {
+    if (currentRole === "manager" && !["reception", "housekeeping"].includes(user.role)) {
+      alert("Managers may edit Reception or Housekeeping users only.");
+      return;
+    }
     setEditingUser(user);
     setFullName(user.full_name);
     setEmail(user.email ?? "");
@@ -608,9 +619,7 @@ export default function UsersPermissionsPage() {
 
       setShowUserModal(false);
 
-      await loadAccessControl(
-        propertyId
-      );
+      await loadAccessControl(propertyId, currentRole);
     } catch (error) {
       alert(
         error instanceof Error
@@ -982,7 +991,9 @@ export default function UsersPermissionsPage() {
           </div>
 
           <div style={roleTabs}>
-            {ROLES.map(
+            {ROLES.filter((role) =>
+              currentRole === "owner" || ["reception", "housekeeping"].includes(role.role)
+            ).map(
               (role) => (
                 <button
                   type="button"
@@ -1247,7 +1258,9 @@ export default function UsersPermissionsPage() {
               }
               style={inputStyle}
             >
-              {ROLES.map(
+              {ROLES.filter((role) =>
+                currentRole === "owner" || ["reception", "housekeeping"].includes(role.role)
+              ).map(
                 (role) => (
                   <option
                     key={role.role}
@@ -1322,7 +1335,7 @@ export default function UsersPermissionsPage() {
             </label>
 
             <div style={securityNotice}>
-              Owner / Admin has full access to all properties. Manager, Reception and Housekeeping are restricted to their assigned property. Staff creation is protected by the signed-in user's secure login session.
+              Owner / Admin has full access to all properties. Manager, Reception and Housekeeping are restricted to their assigned property. Staff creation is protected by the signed-in user&apos;s secure login session.
             </div>
 
             <div style={modalActions}>
@@ -1500,7 +1513,6 @@ function roleTitle(
 const BLUE = "#0D5FA8";
 const DARK_BLUE = "#0B477F";
 const GREEN = "#16885A";
-const PAGE_BG = "#F4F8FC";
 const TEXT = "#17212B";
 const MUTED = "#6F7D8C";
 
@@ -1509,19 +1521,20 @@ const MUTED = "#6F7D8C";
 // =========================================================
 
 const pageStyle: CSSProperties = {
-  minHeight: "100vh",
-  maxWidth: 1450,
-  margin: "0 auto",
-  padding: "14px 24px 12px",
+  height: "calc(100vh - 142px)",
+  overflow: "auto",
+  width: "100%",
+  margin: 0,
+  padding: "12px 22px",
   boxSizing: "border-box",
-  fontFamily: "Arial, sans-serif",
-  background: PAGE_BG,
+  fontFamily: "Inter, Segoe UI, Arial, sans-serif",
+  background: "linear-gradient(180deg,#E9EEF3 0%,#F7F9FB 100%)",
   color: TEXT,
 };
 
 const brandHeader: CSSProperties = {
+  display: "none",
   minHeight: 72,
-  display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
   gap: 20,
