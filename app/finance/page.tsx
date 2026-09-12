@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
+import FinanceSubnav from "@/src/components/FinanceSubnav";
 import { supabase } from "@/src/lib/supabase";
 import { selectInitialProperty } from "@/src/lib/propertyScope";
 
@@ -108,6 +109,7 @@ export default function FinancePage() {
       </section>
 
       {errorMessage && <div style={errorBox}>{errorMessage}</div>}
+      <FinanceSubnav />
 
       <section style={metricGrid} aria-label="Finance summary">
         <Metric label="EFT received" value={money.format(totals.eft)} hint={`${totals.unmatchedEft} EFT${totals.unmatchedEft === 1 ? "" : "s"} need allocation`} tone="blue" />
@@ -117,17 +119,6 @@ export default function FinancePage() {
       </section>
 
       <section style={workGrid}>
-        <div style={panel}>
-          <div style={panelHeading}><div><h2 style={panelTitle}>Today’s finance work</h2><p style={panelText}>Complete these controls in order.</p></div></div>
-          <div style={taskList}>
-            <Task number="1" title="Allocate EFT payments" detail="Match every bank payment to the correct invoice." href="/finance/eft" status={totals.unmatchedEft ? `${totals.unmatchedEft} waiting` : "Open allocations"} />
-            <Task number="2" title="Review guest and company accounts" detail="Follow up outstanding reservation accounts before they become overdue." href="/billing/accounts?filter=outstanding" status={`${invoices.filter((x) => x.status === "issued" || x.status === "part_paid").length} open invoices`} />
-            <Task number="3" title="Complete X Report and EOD" detail="Compare expected cash, card and EFT totals, then close the business day." href="/cash-up" status="Open control" />
-            <Task number="4" title="Review cashbook and expenses" detail="See all money in and money out, then capture operating expenses." href="/finance/cashbook" status="Open cashbook" />
-            <Task number="5" title="Reconcile the bank account" detail="Import a bank statement and match its entries to receipts and expenses." href="/finance/bank-reconciliation" status="Open reconciliation" />
-          </div>
-        </div>
-
         <div style={panel}>
           <div style={panelHeading}><div><h2 style={panelTitle}>Recent payments</h2><p style={panelText}>Latest 100 transactions for this property.</p></div><Link href="/billing" style={textLink}>Open billing</Link></div>
           <div style={tableWrap}>
@@ -150,11 +141,6 @@ function Metric({ label, value, hint, tone }: { label: string; value: string; hi
   return <article style={metricCard}><div style={{...metricBar, background: colors[tone]}} /><span style={metricLabel}>{label}</span><strong style={metricValue}>{value}</strong><span style={metricHint}>{hint}</span></article>;
 }
 
-function Task({ number, title, detail, status, href }: { number: string; title: string; detail: string; status: string; href?: string }) {
-  const content = <><span style={taskNumber}>{number}</span><span style={taskCopy}><strong style={taskTitle}>{title}</strong><span style={taskDetail}>{detail}</span></span><span style={taskStatus}>{status}</span></>;
-  return href ? <Link href={href} style={task}>{content}</Link> : <div style={task}>{content}</div>;
-}
-
 const page: CSSProperties = { minHeight: "calc(100vh - 112px)", padding: "24px", background: "#F4F8FB", color: "#173F5F", fontFamily: "Arial, Helvetica, sans-serif" };
 const header: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 24, margin: "0 auto 20px", maxWidth: 1440 };
 const eyebrow: CSSProperties = { margin: "0 0 7px", color: "#168257", fontSize: 12, fontWeight: 900, letterSpacing: 1.4 };
@@ -169,19 +155,12 @@ const metricBar: CSSProperties = { position: "absolute", inset: "0 auto 0 0", wi
 const metricLabel: CSSProperties = { display: "block", color: "#657C8E", fontSize: 13, fontWeight: 800 };
 const metricValue: CSSProperties = { display: "block", marginTop: 10, color: "#123F69", fontSize: 24, letterSpacing: -0.4 };
 const metricHint: CSSProperties = { display: "block", marginTop: 7, color: "#7D909F", fontSize: 12 };
-const workGrid: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(320px, .8fr) minmax(480px, 1.2fr)", gap: 16, maxWidth: 1440, margin: "0 auto" };
+const workGrid: CSSProperties = { maxWidth: 1440, margin: "0 auto" };
 const panel: CSSProperties = { minWidth: 0, border: "1px solid #D8E5EE", borderRadius: 12, background: "#FFFFFF", boxShadow: "0 5px 18px rgba(18,63,105,.05)" };
 const panelHeading: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "17px 18px", borderBottom: "1px solid #E4EDF3" };
 const panelTitle: CSSProperties = { margin: 0, color: "#173F5F", fontSize: 17 };
 const panelText: CSSProperties = { margin: "4px 0 0", color: "#788C9B", fontSize: 12 };
 const textLink: CSSProperties = { color: "#0D5FA8", fontSize: 13, fontWeight: 800, textDecoration: "none" };
-const taskList: CSSProperties = { display: "flex", flexDirection: "column", padding: 8 };
-const task: CSSProperties = { display: "flex", alignItems: "center", gap: 12, padding: "13px 10px", borderBottom: "1px solid #EDF2F6", color: "inherit", textDecoration: "none" };
-const taskNumber: CSSProperties = { display: "grid", placeItems: "center", width: 29, height: 29, flex: "0 0 29px", borderRadius: 8, background: "#EAF3FA", color: "#0D5FA8", fontSize: 13, fontWeight: 900 };
-const taskCopy: CSSProperties = { display: "flex", flex: 1, minWidth: 0, flexDirection: "column", gap: 4 };
-const taskTitle: CSSProperties = { color: "#234A67", fontSize: 14 };
-const taskDetail: CSSProperties = { color: "#748A9A", fontSize: 12, lineHeight: 1.4 };
-const taskStatus: CSSProperties = { flex: "0 0 auto", padding: "5px 8px", borderRadius: 999, background: "#F0F5F8", color: "#516B7E", fontSize: 11, fontWeight: 800 };
 const tableWrap: CSSProperties = { maxHeight: 410, overflow: "auto" };
 const table: CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: 13 };
 const th: CSSProperties = { position: "sticky", top: 0, padding: "10px 14px", background: "#F7FAFC", color: "#62798B", textAlign: "left", fontSize: 11, letterSpacing: .3 };
