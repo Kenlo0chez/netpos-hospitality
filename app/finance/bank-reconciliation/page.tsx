@@ -10,6 +10,7 @@ import {
   type CSSProperties,
 } from "react";
 import { supabase } from "@/src/lib/supabase";
+import { selectInitialProperty } from "@/src/lib/propertyScope";
 
 type Property = { id: string; name: string };
 type BankAccount = {
@@ -164,12 +165,8 @@ export default function BankReconciliationPage() {
       setLoading(false);
       return;
     }
-    const rows = (data as Property[]) ?? [];
-    const assigned = sessionStorage.getItem("netpos_property_id");
-    const selected = rows.some((property) => property.id === assigned)
-      ? assigned!
-      : rows[0]?.id ?? "";
-    setProperties(rows);
+    const { scoped, selected } = selectInitialProperty((data as Property[]) ?? []);
+    setProperties(scoped);
     setPropertyId(selected);
     if (selected) await loadAccountData(selected);
     else setLoading(false);
