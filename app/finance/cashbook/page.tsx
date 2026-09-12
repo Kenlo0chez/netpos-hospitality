@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
+import FinanceSubnav from "@/src/components/FinanceSubnav";
 import { supabase } from "@/src/lib/supabase";
 import { selectInitialProperty } from "@/src/lib/propertyScope";
 
@@ -58,7 +59,7 @@ export default function CashbookPage() {
   const paidOut = filtered.reduce((sum, row) => sum + row.moneyOut, 0);
 
   return <main style={page}>
-    <header style={header}><div><div style={eyebrow}>FINANCE · CASHBOOK</div><h1 style={title}>Money in and money out</h1><p style={muted}>One clear chronological record of guest receipts, refunds and operating expenses.</p></div><div style={actions}><Link href="/finance" style={secondary}>← Finance</Link><Link href="/finance/expenses" style={primaryLink}>+ Record Expense</Link><select value={propertyId} onChange={(e) => { setPropertyId(e.target.value); void loadCashbook(e.target.value); }} style={select}>{properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div></header>
+    <header style={header}><div><div style={eyebrow}>FINANCE · CASHBOOK</div><h1 style={title}>Money in and money out</h1><p style={muted}>One clear chronological record of guest receipts, refunds and operating expenses.</p></div><div style={actions}><Link href="/finance" style={secondary}>← Finance</Link><Link href="/finance/expenses" style={primaryLink}>+ Record Expense</Link><select value={propertyId} onChange={(e) => { setPropertyId(e.target.value); void loadCashbook(e.target.value); }} style={select}>{properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div></header><FinanceSubnav />
     {setupRequired && <div style={warning}><strong>Finance database setup required.</strong><span>Migration 002 must be applied before expenses can appear.</span></div>}
     {errorMessage && !setupRequired && <div style={errorBox}>{errorMessage}</div>}
     <section style={summary}><Metric label="Money In" value={money.format(received)} color="#168257" /><Metric label="Money Out" value={money.format(paidOut)} color="#A33A3A" /><Metric label="Net Movement" value={money.format(received - paidOut)} color="#0D5FA8" /><Metric label="Transactions" value={String(filtered.length)} color="#6654A8" /></section>
