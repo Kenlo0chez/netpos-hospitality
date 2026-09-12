@@ -9,6 +9,7 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import ModuleSubnav from "@/src/components/ModuleSubnav";
 import { supabase } from "@/src/lib/supabase";
 
 type Role =
@@ -35,6 +36,7 @@ type MenuItem = {
 const PUBLIC_ROUTES = ["/login"];
 
 const RECEPTION_ROUTES = [
+  "/operations",
   "/front-desk",
   "/reservations",
   "/quotations",
@@ -355,6 +357,7 @@ export default function NetposAccessGuard({
                 })}
             </div>
           </nav>
+          <ModuleSubnav />
         </>
       )}
 
