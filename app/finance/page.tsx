@@ -125,6 +125,7 @@ export default function FinancePage() {
             <Task number="2" title="Review guest and company accounts" detail="Follow up outstanding reservation accounts before they become overdue." href="/billing/accounts?filter=outstanding" status={`${invoices.filter((x) => x.status === "issued" || x.status === "part_paid").length} open invoices`} />
             <Task number="3" title="Complete X Report and EOD" detail="Compare expected cash, card and EFT totals, then close the business day." href="/cash-up" status="Open control" />
             <Task number="4" title="Review cashbook and expenses" detail="See all money in and money out, then capture operating expenses." href="/finance/cashbook" status="Open cashbook" />
+            <Task number="5" title="Reconcile the bank account" detail="Import a bank statement and match its entries to receipts and expenses." href="/finance/bank-reconciliation" status="Open reconciliation" />
           </div>
         </div>
 
