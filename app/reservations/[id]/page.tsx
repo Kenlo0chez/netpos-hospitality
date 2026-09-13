@@ -2344,6 +2344,11 @@ export default function ReservationDetailsPage() {
           roomType?.name ?? "-"
         )}
 
+        ${documentRow(
+          "Reservation Status",
+          formatStatus(reservation.status)
+        )}
+
       </div>
 
       <div class="section">
@@ -2387,9 +2392,9 @@ export default function ReservationDetailsPage() {
         )}
 
         ${documentRow(
-          "Balance",
+          balanceOutstanding < -0.005 ? "Credit" : "Balance",
           money(
-            balanceOutstanding
+            Math.abs(balanceOutstanding)
           ),
           true
         )}
@@ -2688,9 +2693,9 @@ export default function ReservationDetailsPage() {
         )}
 
         ${documentRow(
-          "BALANCE DUE",
+          balanceOutstanding < -0.005 ? "CREDIT" : "BALANCE DUE",
           money(
-            balanceOutstanding
+            Math.abs(balanceOutstanding)
           ),
           true
         )}
