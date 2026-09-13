@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
+import { scopePropertiesForCurrentStaff } from "@/src/lib/propertyScope";
+
+type Property = { id: string; name: string };
 
 type ReservationRow = {
   id: string;
@@ -13,6 +16,7 @@ type ReservationRow = {
   arrival_date: string;
   departure_date: string;
   total_amount: number;
+  properties: Array<{ name: string }> | null;
 };
 
 type Guest = {
@@ -41,6 +45,7 @@ type Account = {
   reservation: ReservationRow;
   guestName: string;
   roomNumber: string;
+  propertyName: string;
   paid: number;
   balance: number;
 };
@@ -51,21 +56,20 @@ export default function ReservationAccountsPage() {
   const outstandingOnly = searchParams.get("filter") === "outstanding";
 
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [propertyId, setPropertyId] = useState("");
+  const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  useEffect(() => {
-    loadAccounts();
-  }, []);
-
-  async function loadAccounts() {
+  const loadAccounts = useCallback(async (selectedPropertyId: string) => {
     setLoading(true);
     setErrorMessage("");
 
     try {
-      const { data: reservations, error: reservationError } = await supabase
+      let reservationQuery = supabase
         .from("reservations")
         .select(`
           id,
@@ -75,9 +79,13 @@ export default function ReservationAccountsPage() {
           status,
           arrival_date,
           departure_date,
-          total_amount
-        `)
-        .order("arrival_date", { ascending: false });
+          total_amount,
+          properties (name)
+        `);
+      if (selectedPropertyId && selectedPropertyId !== "all") {
+        reservationQuery = reservationQuery.eq("property_id", selectedPropertyId);
+      }
+      const { data: reservations, error: reservationError } = await reservationQuery.order("arrival_date", { ascending: false });
 
       if (reservationError) throw new Error(reservationError.message);
 
@@ -163,6 +171,7 @@ export default function ReservationAccountsPage() {
             reservation,
             guestName: guestMap.get(reservation.guest_id) ?? "Guest",
             roomNumber: roomByReservation.get(reservation.id) ?? "-",
+            propertyName: reservation.properties?.[0]?.name ?? "Guesthouse",
             paid,
             balance: Number(reservation.total_amount ?? 0) - paid,
           };
@@ -175,7 +184,26 @@ export default function ReservationAccountsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  const initialise = useCallback(async () => {
+    const { data, error } = await supabase.from("properties").select("id,name").eq("is_active", true).order("name");
+    if (error) { setErrorMessage(error.message); setLoading(false); return; }
+    const scoped = scopePropertiesForCurrentStaff((data as Property[]) ?? []);
+    const staff = JSON.parse(sessionStorage.getItem("netpos_staff") ?? "null") as { role?: string; property_id?: string | null } | null;
+    const owner = staff?.role === "owner";
+    const selected = owner ? "all" : scoped[0]?.id ?? "";
+    setProperties(scoped);
+    setIsOwner(owner);
+    setPropertyId(selected);
+    if (selected) await loadAccounts(selected); else setLoading(false);
+  }, [loadAccounts]);
+
+  useEffect(() => {
+    // Load after the authenticated staff scope is stored by the access guard.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void initialise();
+  }, [initialise]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -207,6 +235,7 @@ export default function ReservationAccountsPage() {
     (sum, item) => sum + Math.max(0, item.balance),
     0
   );
+  const totalCredit = filtered.reduce((sum, item) => sum + Math.max(0, -item.balance), 0);
 
   return (
     <main style={page}>
@@ -222,10 +251,11 @@ export default function ReservationAccountsPage() {
         </div>
 
         <div style={headerActions}>
-          <button onClick={() => router.push("/billing")} style={secondaryButton}>
-            ← Billing
-          </button>
-          <button onClick={loadAccounts} style={primaryButton}>
+          <select value={propertyId} onChange={(event) => { setPropertyId(event.target.value); void loadAccounts(event.target.value); }} style={propertySelect} aria-label="Guesthouse">
+            {isOwner && <option value="all">All Guesthouses</option>}
+            {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
+          </select>
+          <button onClick={() => void loadAccounts(propertyId)} style={primaryButton}>
             Refresh
           </button>
         </div>
@@ -236,6 +266,7 @@ export default function ReservationAccountsPage() {
         <Summary label="Total Charges" value={money(totalCharges)} />
         <Summary label="Total Payments" value={money(totalPaid)} positive />
         <Summary label="Outstanding" value={money(totalOutstanding)} emphasis />
+        <Summary label="Guest Credits" value={money(totalCredit)} positive />
       </section>
 
       <section style={workspace}>
@@ -288,6 +319,7 @@ export default function ReservationAccountsPage() {
                 <tr>
                   <th style={th}>Reservation</th>
                   <th style={th}>Guest</th>
+                  {isOwner && <th style={th}>Guesthouse</th>}
                   <th style={th}>Room</th>
                   <th style={th}>Stay</th>
                   <th style={th}>Status</th>
@@ -302,6 +334,7 @@ export default function ReservationAccountsPage() {
                   <tr key={account.reservation.id}>
                     <td style={tdStrong}>{account.reservation.reservation_number}</td>
                     <td style={td}>{account.guestName}</td>
+                    {isOwner && <td style={td}>{account.propertyName}</td>}
                     <td style={td}>
                       {account.roomNumber === "-" ? "-" : `Room ${account.roomNumber}`}
                     </td>
@@ -327,7 +360,7 @@ export default function ReservationAccountsPage() {
                         fontWeight: 900,
                       }}
                     >
-                      {money(Math.max(0, account.balance))}
+                      {account.balance < -0.005 ? `Credit ${money(-account.balance)}` : money(Math.max(0, account.balance))}
                     </td>
                     <td style={tdRight}>
                       <button
@@ -429,7 +462,7 @@ const eyebrow: CSSProperties = {
 };
 const title: CSSProperties = { margin: "3px 0 0", color: "#0D3F7A", fontSize: 25 };
 const muted: CSSProperties = { margin: "4px 0 0", color: "#6A7C90", fontSize: 9 };
-const headerActions: CSSProperties = { display: "flex", gap: 7 };
+const headerActions: CSSProperties = { display: "flex", gap: 7, alignItems: "center" };
 const primaryButton: CSSProperties = {
   border: 0,
   borderRadius: 8,
@@ -440,19 +473,10 @@ const primaryButton: CSSProperties = {
   fontWeight: 900,
   cursor: "pointer",
 };
-const secondaryButton: CSSProperties = {
-  border: "1px solid #C8D8E5",
-  borderRadius: 8,
-  padding: "9px 13px",
-  background: "#FFFFFF",
-  color: "#0D4F91",
-  fontSize: 9,
-  fontWeight: 900,
-  cursor: "pointer",
-};
+const propertySelect: CSSProperties = { minWidth: 220, height: 34, padding: "0 9px", border: "1px solid #C8D8E5", borderRadius: 8, background: "#FFFFFF", color: "#0D4F91", fontSize: 9, fontWeight: 800 };
 const summaryGrid: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4,1fr)",
+  gridTemplateColumns: "repeat(5,1fr)",
   gap: 9,
   marginTop: 10,
 };
