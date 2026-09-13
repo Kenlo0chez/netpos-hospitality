@@ -16,6 +16,7 @@ type Guest = {
   last_name: string;
   phone: string | null;
   email: string | null;
+  id_number: string | null;
   company_id: string | null;
 };
 
@@ -219,6 +220,7 @@ export default function NewReservationPage() {
         last_name,
         phone,
         email,
+        id_number,
         company_id
       `)
       .order("last_name");
@@ -715,6 +717,18 @@ export default function NewReservationPage() {
         "First name, surname and mobile number are required."
       );
 
+      return;
+    }
+
+    const duplicate = guests.find((guest) =>
+      (normalizeGuestPhone(newMobile) && normalizeGuestPhone(guest.phone ?? "") === normalizeGuestPhone(newMobile)) ||
+      (normalizeGuestText(newEmail) && normalizeGuestText(guest.email ?? "") === normalizeGuestText(newEmail)) ||
+      (normalizeGuestText(newIdNumber) && normalizeGuestText(guest.id_number ?? "") === normalizeGuestText(newIdNumber))
+    );
+    if (duplicate) {
+      setGuestId(duplicate.id);
+      setShowGuestModal(false);
+      alert(`An existing guest profile matches these details: ${duplicate.first_name} ${duplicate.last_name}. Netpos selected it instead of creating a duplicate.`);
       return;
     }
 
@@ -2847,3 +2861,15 @@ const modalActions: React.CSSProperties = {
   gap: 8,
   marginTop: 20,
 };
+
+function normalizeGuestText(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function normalizeGuestPhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("264")) return digits;
+  if (digits.startsWith("0")) return `264${digits.slice(1)}`;
+  return digits.length === 8 ? `264${digits}` : digits;
+}
