@@ -45,6 +45,17 @@ type Payment = {
   received_at: string;
 };
 
+type Payout = {
+  id: string;
+  trading_day_id: string | null;
+  payout_type: string;
+  payment_method: string;
+  payee_name: string;
+  reference: string;
+  amount: number;
+  status: string;
+};
+
 type ReservationRoom = {
   room_id: string | null;
   rooms: {
@@ -99,6 +110,9 @@ export default function XReportPage() {
 
   const [payments, setPayments] =
     useState<Payment[]>([]);
+
+  const [payouts, setPayouts] =
+    useState<Payout[]>([]);
 
   const [reservations, setReservations] =
     useState<Reservation[]>([]);
@@ -401,6 +415,7 @@ export default function XReportPage() {
         paymentResult,
         reservationResult,
         guestResult,
+        payoutResult,
       ] = await Promise.all([
         supabase
           .from("payments")
@@ -452,6 +467,11 @@ export default function XReportPage() {
             first_name,
             last_name
           `),
+        supabase
+          .from("payouts")
+          .select("id,trading_day_id,payout_type,payment_method,payee_name,reference,amount,status")
+          .eq("trading_day_id", tradingDayId)
+          .eq("status", "posted"),
       ]);
 
       if (paymentResult.error) {
@@ -472,6 +492,10 @@ export default function XReportPage() {
         );
       }
 
+      if (payoutResult.error) {
+        throw new Error(`Payouts: ${payoutResult.error.message}`);
+      }
+
       setPayments(
         (paymentResult.data as Payment[]) ??
           []
@@ -486,6 +510,7 @@ export default function XReportPage() {
         (guestResult.data as Guest[]) ??
           []
       );
+      setPayouts((payoutResult.data as Payout[]) ?? []);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -627,6 +652,13 @@ export default function XReportPage() {
   const cashTotal =
     methodTotal("cash");
 
+  const cashPayoutTotal = payouts
+    .filter((payout) => payout.payment_method === "cash")
+    .reduce((total, payout) => total + Number(payout.amount), 0);
+
+  const payoutTotal = payouts
+    .reduce((total, payout) => total + Number(payout.amount), 0);
+
   const cardTotal =
     methodTotal("card");
 
@@ -681,7 +713,7 @@ export default function XReportPage() {
     "closed";
 
   const expectedDrawerCash =
-    Number(selectedReportDay?.opening_float ?? 0) + cashTotal;
+    Number(selectedReportDay?.opening_float ?? 0) + cashTotal - cashPayoutTotal;
 
   const enteredCountedCash =
     countedCash.trim() === "" ? null : Number(countedCash);
@@ -947,6 +979,10 @@ export default function XReportPage() {
               <div class="value">${money(
                 refundTotal
               )}</div>
+            </div>
+            <div class="box">
+              <div class="label">PAYOUTS</div>
+              <div class="value">${money(payoutTotal)}</div>
             </div>
             <div class="box">
               <div class="label">NET TOTAL</div>
@@ -1364,6 +1400,12 @@ export default function XReportPage() {
         />
 
         <SummaryCard
+          label="Payouts"
+          value={money(payoutTotal)}
+          tone="red"
+        />
+
+        <SummaryCard
           label="Net Total"
           value={money(netTotal)}
           tone="green"
@@ -1389,8 +1431,8 @@ export default function XReportPage() {
             <strong>{money(Number(selectedReportDay?.opening_float ?? 0))}</strong>
           </div>
           <div style={cashMetric}>
-            <span style={cashMetricLabel}>Cash activity</span>
-            <strong>{money(cashTotal)}</strong>
+            <span style={cashMetricLabel}>Net cash activity</span>
+            <strong>{money(cashTotal - cashPayoutTotal)}</strong>
           </div>
           <div style={cashMetric}>
             <span style={cashMetricLabel}>Expected drawer</span>
