@@ -53,6 +53,7 @@ type Property = {
 
   payment_reference_instruction: string | null;
   invoice_terms: string | null;
+  receipt_prefix: string | null;
 };
 
 type Reservation = {
@@ -128,6 +129,13 @@ type Payment = {
 
   notes: string | null;
   received_at: string;
+};
+
+type Receipt = {
+  id: string;
+  payment_id: string;
+  receipt_number: string;
+  issued_at: string;
 };
 
 type Invoice = {
@@ -259,6 +267,8 @@ export default function ReservationDetailsPage() {
     payments,
     setPayments,
   ] = useState<Payment[]>([]);
+
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
 
   const [
     invoice,
@@ -509,7 +519,8 @@ export default function ReservationDetailsPage() {
           bank_account_number,
           bank_branch_code,
           payment_reference_instruction,
-          invoice_terms
+          invoice_terms,
+          receipt_prefix
         `)
         .eq(
           "id",
@@ -771,9 +782,18 @@ export default function ReservationDetailsPage() {
       );
     }
 
-    setPayments(
-      (data as Payment[]) ?? []
-    );
+    const loadedPayments = (data as Payment[]) ?? [];
+    setPayments(loadedPayments);
+    if (!loadedPayments.length) {
+      setReceipts([]);
+      return;
+    }
+    const { data: receiptData, error: receiptError } = await supabase
+      .from("receipts")
+      .select("id,payment_id,receipt_number,issued_at")
+      .in("payment_id", loadedPayments.map((payment) => payment.id));
+    if (receiptError) throw new Error(receiptError.message);
+    setReceipts((receiptData as Receipt[]) ?? []);
   }
 
   // =========================================================
@@ -1121,6 +1141,7 @@ export default function ReservationDetailsPage() {
         );
 
       const {
+        data: createdPayment,
         error,
       } = await supabase
         .from("payments")
@@ -1158,12 +1179,26 @@ export default function ReservationDetailsPage() {
 
           received_at:
             new Date().toISOString(),
-        });
+        })
+        .select("id")
+        .single();
 
       if (error) {
         throw new Error(
           error.message
         );
+      }
+
+      const revisedPaid = transactionType === "refund" ? totalPaid - amount : totalPaid + amount;
+      await syncInvoiceStatus(revisedPaid);
+
+      if (transactionType !== "refund" && createdPayment?.id) {
+        const { error: receiptError } = await supabase.from("receipts").insert({
+          property_id: reservation.property_id,
+          payment_id: createdPayment.id,
+          receipt_number: generateDocumentNumber(property?.receipt_prefix || "RCT"),
+        });
+        if (receiptError) console.error("Receipt creation:", receiptError.message);
       }
 
       await logReservationAction(
@@ -1737,6 +1772,8 @@ export default function ReservationDetailsPage() {
         received_at: new Date().toISOString(),
       });
       if (error) throw new Error(error.message);
+      const revisedPaid = reversalType === "refund" ? totalPaid - Number(payment.amount) : totalPaid + Number(payment.amount);
+      await syncInvoiceStatus(revisedPaid);
       await logReservationAction("payment_reversed", { payment_id: payment.id }, { transaction_type: reversalType, amount: payment.amount }, reason.trim());
       await loadPayments(reservation.id);
       setMessage("Payment reversal recorded. The original transaction remains in history.");
@@ -1943,6 +1980,19 @@ export default function ReservationDetailsPage() {
   // GENERATE INVOICE
   // =========================================================
 
+  async function syncInvoiceStatus(netPaid: number) {
+    if (!invoice) return;
+    const invoiceTotal = Number(invoice.total_amount ?? 0);
+    const status = netPaid >= invoiceTotal - 0.005 ? "paid" : netPaid > 0.005 ? "part_paid" : "issued";
+    if (status === invoice.status) return;
+    const { error } = await supabase.from("invoices").update({ status }).eq("id", invoice.id).neq("status", "void");
+    if (error) {
+      console.error("Invoice status sync:", error.message);
+      return;
+    }
+    setInvoice((current) => current ? { ...current, status } : current);
+  }
+
   async function generateInvoice() {
     if (
       !reservation ||
@@ -1952,6 +2002,11 @@ export default function ReservationDetailsPage() {
     }
 
     if (invoice) {
+      if (Math.abs(Number(invoice.total_amount) - Number(reservation.total_amount)) > 0.005) {
+        alert(`Invoice ${invoice.invoice_number} is for ${money(invoice.total_amount)}, but the current stay is ${money(reservation.total_amount)}. A manager or owner must void it before generating the corrected invoice.`);
+        return;
+      }
+      await syncInvoiceStatus(totalPaid);
       openInvoicePDF();
       return;
     }
@@ -1959,6 +2014,21 @@ export default function ReservationDetailsPage() {
     setGeneratingInvoice(true);
 
     try {
+      const { data: existingInvoice, error: existingInvoiceError } = await supabase
+        .from("invoices")
+        .select("id,invoice_number")
+        .eq("reservation_id", reservation.id)
+        .neq("status", "void")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (existingInvoiceError) throw new Error(existingInvoiceError.message);
+      if (existingInvoice) {
+        await loadInvoice(reservation.id);
+        setMessage(`Invoice ${existingInvoice.invoice_number} already exists. Netpos prevented a duplicate invoice.`);
+        return;
+      }
+
       const invoiceNumber =
         generateDocumentNumber(
           "INV"
@@ -2159,6 +2229,29 @@ export default function ReservationDetailsPage() {
           ? error.message
           : "Could not generate invoice."
       );
+    } finally {
+      setGeneratingInvoice(false);
+    }
+  }
+
+  async function voidInvoice() {
+    if (!invoice || !reservation || !["owner", "manager"].includes(currentStaffRole)) return;
+    const reason = window.prompt(`Reason for voiding invoice ${invoice.invoice_number}:`);
+    if (!reason?.trim()) {
+      if (reason !== null) alert("A void reason is required.");
+      return;
+    }
+    if (!window.confirm(`Void ${invoice.invoice_number}? The invoice and its line items will remain in history, and a corrected invoice can then be generated.`)) return;
+    setGeneratingInvoice(true);
+    try {
+      const { error } = await supabase.from("invoices").update({ status: "void", notes: `${invoice.notes ? `${invoice.notes}\n` : ""}Voided: ${reason.trim()}` }).eq("id", invoice.id).neq("status", "void");
+      if (error) throw new Error(error.message);
+      await logReservationAction("invoice_voided", { invoice_id: invoice.id, invoice_number: invoice.invoice_number, status: invoice.status }, { status: "void" }, reason.trim());
+      setInvoice(null);
+      setInvoiceItems([]);
+      setMessage(`Invoice ${invoice.invoice_number} voided. You can now generate the corrected tax invoice.`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Could not void the invoice.");
     } finally {
       setGeneratingInvoice(false);
     }
@@ -2369,6 +2462,7 @@ export default function ReservationDetailsPage() {
           `
         )
         .join("");
+    const invoiceBalance = Number(selectedInvoice.total_amount) - totalPaid;
 
     const html = `
       ${documentHeader(
@@ -2393,6 +2487,11 @@ export default function ReservationDetailsPage() {
           formatFriendlyDate(
             selectedInvoice.invoice_date
           )
+        )}
+
+        ${documentRow(
+          "Status",
+          formatInvoiceStatus(selectedInvoice.status)
         )}
 
       </div>
@@ -2455,9 +2554,9 @@ export default function ReservationDetailsPage() {
         )}
 
         ${documentRow(
-          "Balance",
+          invoiceBalance < -0.005 ? "Credit" : "Balance",
           money(
-            balanceOutstanding
+            Math.abs(invoiceBalance)
           ),
           true
         )}
@@ -2633,124 +2732,47 @@ export default function ReservationDetailsPage() {
   // PAYMENT RECEIPT
   // =========================================================
 
-  function openReceiptPDF() {
-    if (
-      !reservation ||
-      payments.length === 0
-    ) {
-      alert(
-        "No payment has been recorded yet."
-      );
-
+  async function openReceiptPDF(selectedPayment?: Payment) {
+    if (!reservation) return;
+    const payment = selectedPayment ?? payments.find((item) => item.transaction_type !== "refund");
+    if (!payment) {
+      alert("No receiptable payment has been recorded yet. Refunds and reversals appear on the guest statement instead.");
       return;
     }
 
-    const paymentRows =
-      payments
-        .map(
-          (payment) => `
-            <tr>
-              <td>
-                ${escapeHtml(
-                  formatDateTime(
-                    payment.received_at
-                  )
-                )}
-              </td>
+    let receipt = receipts.find((item) => item.payment_id === payment.id) ?? null;
+    if (!receipt) {
+      const { data, error } = await supabase.from("receipts").insert({
+        property_id: reservation.property_id,
+        payment_id: payment.id,
+        receipt_number: generateDocumentNumber(property?.receipt_prefix || "RCT"),
+      }).select("id,payment_id,receipt_number,issued_at").single();
+      if (error) {
+        alert(`The numbered receipt could not be created: ${error.message}`);
+        return;
+      }
+      receipt = data as Receipt;
+      setReceipts((current) => [...current, receipt as Receipt]);
+    }
 
-              <td>
-                ${escapeHtml(
-                  formatPaymentMethod(
-                    payment.payment_method
-                  )
-                )}
-              </td>
-
-              <td>
-                ${escapeHtml(
-                  payment.payment_reference ??
-                    "-"
-                )}
-              </td>
-
-              <td class="right">
-                ${
-                  payment.transaction_type ===
-                  "refund"
-                    ? "-"
-                    : ""
-                }${escapeHtml(
-                  money(payment.amount)
-                )}
-              </td>
-            </tr>
-          `
-        )
-        .join("");
-
+    const currentBalance = Number(reservation.total_amount) - totalPaid;
     const html = `
-      ${documentHeader(
-        "PAYMENT RECEIPT",
-        reservation.reservation_number
-      )}
-
+      ${documentHeader("PAYMENT RECEIPT", receipt.receipt_number)}
       <div class="section">
-        ${documentRow(
-          "Received From",
-          guestName()
-        )}
-
-        ${documentRow(
-          "Reservation",
-          reservation.reservation_number
-        )}
-
-        ${documentRow(
-          "Net Amount Received",
-          money(totalPaid),
-          true
-        )}
+        ${documentRow("Received From", guestName())}
+        ${documentRow("Reservation", reservation.reservation_number)}
+        ${documentRow("Payment Date", formatDateTime(payment.received_at))}
+        ${documentRow("Payment Method", formatPaymentMethod(payment.payment_method))}
+        ${documentRow("Reference", payment.payment_reference ?? "-")}
+        ${documentRow("Amount Received", money(payment.amount), true)}
       </div>
-
       <div class="section">
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Method</th>
-              <th>Reference</th>
-              <th class="right">Amount</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            ${paymentRows}
-          </tbody>
-        </table>
-      </div>
-
-      <div class="section">
-        ${documentRow(
-          "Reservation Total",
-          money(
-            reservation.total_amount
-          )
-        )}
-
-        ${documentRow(
-          "Balance Due",
-          money(
-            balanceOutstanding
-          ),
-          true
-        )}
+        ${documentRow("Reservation Total", money(reservation.total_amount))}
+        ${documentRow(currentBalance < -0.005 ? "Current Credit" : "Current Balance", money(Math.abs(currentBalance)), true)}
       </div>
     `;
 
-    openPrintWindow(
-      `${reservation.reservation_number} - Payment Receipt`,
-      html
-    );
+    openPrintWindow(`${receipt.receipt_number} - Payment Receipt`, html);
   }
 
   // =========================================================
@@ -3927,6 +3949,16 @@ ${body}
                           )}
                         </strong>
 
+                        {payment.transaction_type !== "refund" && (
+                          <button
+                            type="button"
+                            onClick={() => void openReceiptPDF(payment)}
+                            style={receiptButton}
+                          >
+                            {receipts.some((receipt) => receipt.payment_id === payment.id) ? "Receipt" : "Issue Receipt"}
+                          </button>
+                        )}
+
                         {["owner", "manager"].includes(currentStaffRole) && (
                           <button
                             type="button"
@@ -3984,7 +4016,7 @@ ${body}
                       No invoice has been generated yet.
                     </div>
                   ) : (
-                    <div style={invoiceCard}>
+                    <div><div style={invoiceCard}>
                       <div>
                         <span style={smallLabel}>
                           INVOICE NUMBER
@@ -4017,7 +4049,7 @@ ${body}
                           )}
                         </strong>
                       </div>
-                    </div>
+                    </div>{["owner", "manager"].includes(currentStaffRole) && <button type="button" onClick={() => void voidInvoice()} disabled={generatingInvoice} style={reverseButton}>Void invoice and allow corrected reissue</button>}</div>
                   )}
                 </div>
               )}
@@ -4096,14 +4128,12 @@ ${body}
 
                     <button
                       type="button"
-                      onClick={() =>
-                        openReceiptPDF()
-                      }
-                      disabled={payments.length === 0}
+                      onClick={() => void openReceiptPDF()}
+                      disabled={!payments.some((payment) => payment.transaction_type !== "refund")}
                       style={{
                         ...documentActionCard,
                         opacity:
-                          payments.length === 0
+                          !payments.some((payment) => payment.transaction_type !== "refund")
                             ? 0.5
                             : 1,
                       }}
@@ -5617,6 +5647,12 @@ const reverseButton: CSSProperties = {
   fontSize: 8,
   fontWeight: 900,
   cursor: "pointer",
+};
+
+const receiptButton: CSSProperties = {
+  ...reverseButton,
+  borderColor: "#A9C7DD",
+  color: "#0D5FA8",
 };
 
 const closeButton: CSSProperties = {
