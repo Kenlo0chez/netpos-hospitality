@@ -1,0 +1,522 @@
+"use client";
+
+import Link from "next/link";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+} from "react";
+import { supabase } from "@/src/lib/supabase";
+import { selectInitialProperty } from "@/src/lib/propertyScope";
+
+type Property = { id: string; name: string };
+type Reservation = {
+  id: string;
+  property_id: string;
+  reservation_number: string;
+  status: string;
+  arrival_date: string;
+  departure_date: string;
+  total_amount: number;
+  guests: { first_name: string; last_name: string } | null;
+};
+type Invoice = {
+  property_id: string;
+  reservation_id: string | null;
+  status: string;
+  total_amount: number;
+};
+type Payment = {
+  property_id: string;
+  reservation_id: string | null;
+  transaction_type: string;
+  amount: number;
+};
+type Room = {
+  id: string;
+  property_id: string;
+  room_number: string;
+  housekeeping_status: string | null;
+  operational_status: string;
+};
+type Issue = {
+  severity: "stop" | "attention";
+  title: string;
+  detail: string;
+  href: string;
+  action: string;
+};
+const today = new Date().toISOString().slice(0, 10);
+const money = new Intl.NumberFormat("en-NA", {
+  style: "currency",
+  currency: "NAD",
+  minimumFractionDigits: 2,
+});
+export default function OperationsPage() {
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [propertyId, setPropertyId] = useState("");
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const load = useCallback(async (id: string) => {
+    setLoading(true);
+    setError("");
+    let reservationQuery = supabase
+        .from("reservations")
+        .select(
+          "id,property_id,reservation_number,status,arrival_date,departure_date,total_amount,guests(first_name,last_name)",
+        )
+        .in("status", ["provisional", "confirmed", "checked_in"])
+        .lte("arrival_date", today)
+        .gte("departure_date", today)
+        .order("arrival_date");
+    let invoiceQuery = supabase
+        .from("invoices")
+        .select("property_id,reservation_id,status,total_amount")
+        .neq("status", "void");
+    let paymentQuery = supabase
+        .from("payments")
+        .select("property_id,reservation_id,transaction_type,amount");
+    let roomQuery = supabase
+        .from("rooms")
+        .select("id,property_id,room_number,housekeeping_status,operational_status")
+        .order("room_number");
+    if (id) {
+      reservationQuery = reservationQuery.eq("property_id", id);
+      invoiceQuery = invoiceQuery.eq("property_id", id);
+      paymentQuery = paymentQuery.eq("property_id", id);
+      roomQuery = roomQuery.eq("property_id", id);
+    }
+    const [r, i, p, rm] = await Promise.all([
+      reservationQuery,
+      invoiceQuery,
+      paymentQuery,
+      roomQuery,
+    ]);
+    const first = r.error ?? i.error ?? p.error ?? rm.error;
+    if (first) setError(first.message);
+    else {
+      setReservations((r.data as unknown as Reservation[]) ?? []);
+      setInvoices((i.data as Invoice[]) ?? []);
+      setPayments((p.data as Payment[]) ?? []);
+      setRooms((rm.data as Room[]) ?? []);
+    }
+    setLoading(false);
+  }, []);
+  const initialise = useCallback(async () => {
+    const result = await supabase
+      .from("properties")
+      .select("id,name")
+      .eq("is_active", true)
+      .order("name");
+    if (result.error) {
+      setError(result.error.message);
+      setLoading(false);
+      return;
+    }
+    const { scoped, selected } = selectInitialProperty(
+      (result.data as Property[]) ?? [],
+    );
+    setProperties(scoped);
+    setPropertyId(selected);
+    await load(selected);
+  }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void initialise();
+  }, [initialise]);
+  const issues = useMemo(() => {
+    const list: Issue[] = [];
+    const paid = new Map<string, number>();
+    const propertyName = (id: string) =>
+      properties.find((property) => property.id === id)?.name ?? "Guesthouse";
+    const scope = (id: string) => (propertyId ? "" : `${propertyName(id)} · `);
+    payments.forEach((x) => {
+      if (!x.reservation_id) return;
+      paid.set(
+        x.reservation_id,
+        (paid.get(x.reservation_id) ?? 0) +
+          (x.transaction_type === "refund"
+            ? -Number(x.amount)
+            : Number(x.amount)),
+      );
+    });
+    reservations.forEach((r) => {
+      const guest = r.guests
+        ? `${r.guests.first_name} ${r.guests.last_name}`
+        : "Guest";
+      if (r.arrival_date === today && r.status === "provisional")
+        list.push({
+          severity: "stop",
+          title: `${r.reservation_number} is still provisional`,
+          detail: `${scope(r.property_id)}${guest} arrives today. Confirm, cancel or mark no-show.`,
+          href: `/reservations/${r.id}`,
+          action: "Resolve arrival",
+        });
+      if (
+        r.arrival_date < today &&
+        ["provisional", "confirmed"].includes(r.status)
+      )
+        list.push({
+          severity: "stop",
+          title: `Overdue arrival: ${r.reservation_number}`,
+          detail: `${scope(r.property_id)}${guest} should already have arrived. Check in, cancel or mark no-show.`,
+          href: `/reservations/${r.id}`,
+          action: "Resolve status",
+        });
+      if (r.departure_date <= today && r.status === "checked_in")
+        list.push({
+          severity: "attention",
+          title: `Departure due: ${r.reservation_number}`,
+          detail: `${scope(r.property_id)}${guest} is due to check out today.`,
+          href: `/reservations/${r.id}`,
+          action: "Open stay",
+        });
+      const invoiced = invoices
+        .filter((x) => x.reservation_id === r.id)
+        .reduce((s, x) => s + Number(x.total_amount), 0);
+      const balance =
+        Math.max(Number(r.total_amount), invoiced) - (paid.get(r.id) ?? 0);
+      if (balance > 0.009 && r.status === "checked_in")
+        list.push({
+          severity: "attention",
+          title: `Outstanding ${money.format(balance)}`,
+          detail: `${scope(r.property_id)}${r.reservation_number} · ${guest}`,
+          href: `/reservations/${r.id}`,
+          action: "Collect / review",
+        });
+    });
+    rooms
+      .filter((r) => r.operational_status === "out_of_service")
+      .forEach((r) =>
+        list.push({
+          severity: "attention",
+          title: `Room ${r.room_number} out of service`,
+          detail: `${scope(r.property_id)}Confirm the maintenance block is still required.`,
+          href: "/housekeeping",
+          action: "Review room",
+        }),
+      );
+    rooms
+      .filter((r) => r.housekeeping_status === "dirty")
+      .forEach((r) =>
+        list.push({
+          severity: "attention",
+          title: `Room ${r.room_number} is dirty`,
+          detail: `${scope(r.property_id)}Housekeeping must clean and release this room.`,
+          href: "/housekeeping",
+          action: "Open housekeeping",
+        }),
+      );
+    return list;
+  }, [invoices, payments, properties, propertyId, reservations, rooms]);
+  const arrivals = reservations.filter(
+    (r) =>
+      r.arrival_date === today &&
+      ["confirmed", "provisional"].includes(r.status),
+  ).length;
+  const departures = reservations.filter(
+    (r) => r.departure_date === today && r.status === "checked_in",
+  ).length;
+  return (
+    <main style={page}>
+      <header style={header}>
+        <div>
+          <div style={eyebrow}>PILOT CALLBACK PREVENTION</div>
+          <h1 style={title}>Daily control centre</h1>
+          <p style={muted}>
+            One list of everything reception must resolve before it becomes
+            tomorrow’s problem.
+          </p>
+        </div>
+        <div style={right}>
+          <span style={date}>{today}</span>
+          <select
+            value={propertyId}
+            onChange={(e) => {
+              setPropertyId(e.target.value);
+              void load(e.target.value);
+            }}
+            style={select}
+          >
+            {properties.length > 1 && (
+              <option value="">All Guesthouses</option>
+            )}
+            {properties.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <button onClick={() => void load(propertyId)} style={refresh}>
+            Refresh
+          </button>
+        </div>
+      </header>
+      {error && <div style={errorBox}>{error}</div>}
+      <section style={cards}>
+        <Card label="Arrivals today" value={arrivals} />
+        <Card label="Departures today" value={departures} />
+        <Card
+          label="Dirty rooms"
+          value={rooms.filter((r) => r.housekeeping_status === "dirty").length}
+        />
+        <Card
+          label="Out of service"
+          value={
+            rooms.filter((r) => r.operational_status === "out_of_service")
+              .length
+          }
+        />
+        <Card
+          label="Exceptions"
+          value={issues.length}
+          danger={issues.length > 0}
+        />
+      </section>
+      <section style={panel}>
+        <div style={panelHead}>
+          <div>
+            <h2 style={panelTitle}>Exceptions requiring action</h2>
+            <p style={small}>
+              Do not delete problems. Open the record and resolve its correct
+              status.
+            </p>
+          </div>
+          <Link href="/reservations/new" style={newButton}>
+            + New Reservation
+          </Link>
+        </div>
+        {issues.map((issue, index) => (
+          <div key={`${issue.title}-${index}`} style={issueRow}>
+            <span
+              style={{
+                ...severity,
+                background: issue.severity === "stop" ? "#FCE8E8" : "#FFF1D8",
+                color: issue.severity === "stop" ? "#A12F2F" : "#8A5A0A",
+              }}
+            >
+              {issue.severity === "stop" ? "MUST FIX" : "CHECK"}
+            </span>
+            <div style={copy}>
+              <strong>{issue.title}</strong>
+              <span>{issue.detail}</span>
+            </div>
+            <Link href={issue.href} style={action}>
+              {issue.action} →
+            </Link>
+          </div>
+        ))}
+        {!loading && !issues.length && (
+          <div style={clear}>
+            <strong>All clear</strong>
+            <span>
+              No overdue arrivals, due departures, unpaid in-house stays or
+              room-status exceptions were found.
+            </span>
+          </div>
+        )}
+      </section>
+      <section style={footerActions}>
+        <Link href="/front-desk" style={shortcut}>
+          Room Board
+        </Link>
+        <Link href="/reservations" style={shortcut}>
+          Reservation Calendar
+        </Link>
+        <Link href="/cash-up" style={shortcut}>
+          X Report / EOD
+        </Link>
+        <Link href="/finance" style={shortcut}>
+          Finance Control
+        </Link>
+      </section>
+    </main>
+  );
+}
+function Card({
+  label,
+  value,
+  danger,
+}: {
+  label: string;
+  value: number;
+  danger?: boolean;
+}) {
+  return (
+    <article style={{ ...card, ...(danger ? dangerCard : {}) }}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </article>
+  );
+}
+const page: CSSProperties = {
+  height: "calc(100vh - 142px)",
+  overflow: "auto",
+  padding: "16px 22px",
+  boxSizing: "border-box",
+  background: "linear-gradient(180deg,#EEF2F5 0%,#F7F9FB 100%)",
+  fontFamily: "Inter,Segoe UI,Arial,sans-serif",
+  color: "#15283A",
+};
+const header: CSSProperties = {
+  maxWidth: 1600,
+  margin: "0 auto 12px",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-end",
+  gap: 20,
+};
+const eyebrow: CSSProperties = {
+  color: "#168257",
+  fontSize: 11,
+  fontWeight: 900,
+  letterSpacing: 1.3,
+};
+const title: CSSProperties = {
+  margin: "5px 0",
+  fontSize: 28,
+  color: "#123F69",
+};
+const muted: CSSProperties = { margin: 0, color: "#6C8293", fontSize: 14 };
+const right: CSSProperties = { display: "flex", alignItems: "center", gap: 8 };
+const date: CSSProperties = { color: "#607789", fontSize: 12, fontWeight: 800 };
+const select: CSSProperties = {
+  height: 40,
+  minWidth: 220,
+  padding: "0 10px",
+  border: "1px solid #BDD0DE",
+  borderRadius: 7,
+  background: "#FFF",
+  color: "#173F5F",
+  fontWeight: 700,
+};
+const refresh: CSSProperties = {
+  height: 40,
+  padding: "0 13px",
+  border: 0,
+  borderRadius: 7,
+  background: "#0D5FA8",
+  color: "#FFF",
+  fontWeight: 800,
+  cursor: "pointer",
+};
+const cards: CSSProperties = {
+  maxWidth: 1440,
+  margin: "0 auto 13px",
+  display: "grid",
+  gridTemplateColumns: "repeat(5,1fr)",
+  gap: 10,
+};
+const card: CSSProperties = {
+  padding: 14,
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  border: "1px solid #D7E4ED",
+  borderRadius: 9,
+  background: "#FFF",
+  color: "#607789",
+  fontSize: 12,
+};
+const dangerCard: CSSProperties = {
+  borderColor: "#E4B0B0",
+  background: "#FFF5F5",
+  color: "#A12F2F",
+};
+const panel: CSSProperties = {
+  maxWidth: 1440,
+  margin: "0 auto",
+  overflow: "hidden",
+  border: "1px solid #D7E4ED",
+  borderRadius: 11,
+  background: "#FFF",
+};
+const panelHead: CSSProperties = {
+  padding: 15,
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  borderBottom: "1px solid #E5EDF3",
+};
+const panelTitle: CSSProperties = { margin: 0, fontSize: 17 };
+const small: CSSProperties = {
+  margin: "4px 0 0",
+  color: "#708696",
+  fontSize: 12,
+};
+const newButton: CSSProperties = {
+  padding: "10px 13px",
+  borderRadius: 7,
+  background: "#168257",
+  color: "#FFF",
+  fontSize: 12,
+  fontWeight: 900,
+  textDecoration: "none",
+};
+const issueRow: CSSProperties = {
+  padding: "12px 15px",
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  borderTop: "1px solid #E9F0F4",
+};
+const severity: CSSProperties = {
+  width: 70,
+  padding: "5px 7px",
+  borderRadius: 999,
+  textAlign: "center",
+  fontSize: 9,
+  fontWeight: 900,
+};
+const copy: CSSProperties = {
+  flex: 1,
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  fontSize: 13,
+};
+const action: CSSProperties = {
+  color: "#0D5FA8",
+  fontSize: 12,
+  fontWeight: 900,
+  textDecoration: "none",
+};
+const clear: CSSProperties = {
+  padding: 40,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: 7,
+  color: "#168257",
+};
+const footerActions: CSSProperties = {
+  maxWidth: 1440,
+  margin: "12px auto 0",
+  display: "flex",
+  gap: 8,
+};
+const shortcut: CSSProperties = {
+  padding: "9px 12px",
+  border: "1px solid #BDD0DE",
+  borderRadius: 7,
+  background: "#FFF",
+  color: "#0D5FA8",
+  fontSize: 12,
+  fontWeight: 800,
+  textDecoration: "none",
+};
+const errorBox: CSSProperties = {
+  maxWidth: 1440,
+  margin: "0 auto 12px",
+  padding: 12,
+  border: "1px solid #E5B0B0",
+  borderRadius: 8,
+  background: "#FFF2F2",
+  color: "#982F2F",
+};

@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #e9eef3;
+  --foreground: #15283a;
+  --netpos-black: #071b2f;
+  --netpos-blue: #0d5fa8;
+  --netpos-silver: #c8d0d8;
+  --netpos-surface: #ffffff;
 }
 
 @theme inline {
@@ -12,15 +16,63 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
+  margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: Inter, "Segoe UI", Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a,
+select {
+  transition: background-color 140ms ease, border-color 140ms ease,
+    color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+button:hover:not(:disabled),
+a:hover {
+  filter: brightness(0.985);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(13, 95, 168, 0.22);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: #cfe5f7;
+  color: #071b2f;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #e9eef2;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #9cabb8;
+  border: 2px solid #e9eef2;
+  border-radius: 999px;
 }

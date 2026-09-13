@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
+import { selectInitialProperty } from "@/src/lib/propertyScope";
 
 type Property = {
   id: string;
@@ -77,8 +78,7 @@ export default function ReservationsPage() {
   const [viewMode, setViewMode] = useState<"board" | "list">("board");
   const [propertyId, setPropertyId] = useState("");
   const [boardStartDate, setBoardStartDate] = useState(getTodayString());
-
-  const boardDays = 14;
+  const [boardDays, setBoardDays] = useState<7 | 14 | 30>(14);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
@@ -87,6 +87,7 @@ export default function ReservationsPage() {
     useState<DateSelection | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
     initialisePage();
   }, []);
 
@@ -94,10 +95,10 @@ export default function ReservationsPage() {
     setLoading(true);
 
     try {
+      const allowedPropertyIds = await loadProperties();
       await Promise.all([
-        loadProperties(),
-        loadRooms(),
-        loadReservations(),
+        loadRooms(allowedPropertyIds),
+        loadReservations(allowedPropertyIds),
       ]);
     } finally {
       setLoading(false);
@@ -112,19 +113,22 @@ export default function ReservationsPage() {
 
     if (error) {
       alert(`Properties: ${error.message}`);
-      return;
+      return [] as string[];
     }
 
-    const rows = (data as Property[]) ?? [];
-
-    setProperties(rows);
-
-    if (rows.length === 1) {
-      setPropertyId(rows[0].id);
-    }
+    const { scoped, selected } = selectInitialProperty(
+      (data as Property[]) ?? [],
+    );
+    setProperties(scoped);
+    setPropertyId(scoped.length > 1 ? "" : selected);
+    return scoped.map((property) => property.id);
   }
 
-  async function loadRooms() {
+  async function loadRooms(allowedPropertyIds: string[]) {
+    if (!allowedPropertyIds.length) {
+      setRooms([]);
+      return;
+    }
     const { data, error } = await supabase
       .from("rooms")
       .select(`
@@ -138,6 +142,7 @@ export default function ReservationsPage() {
           name
         )
       `)
+      .in("property_id", allowedPropertyIds)
       .eq("operational_status", "active")
       .order("room_number");
 
@@ -149,7 +154,11 @@ export default function ReservationsPage() {
     setRooms((data as unknown as Room[]) ?? []);
   }
 
-  async function loadReservations() {
+  async function loadReservations(allowedPropertyIds: string[]) {
+    if (!allowedPropertyIds.length) {
+      setReservations([]);
+      return;
+    }
     const { data, error } = await supabase
       .from("reservations")
       .select(`
@@ -185,6 +194,7 @@ export default function ReservationsPage() {
           )
         )
       `)
+      .in("property_id", allowedPropertyIds)
       .order("arrival_date", { ascending: true });
 
     if (error) {
@@ -199,7 +209,7 @@ export default function ReservationsPage() {
     return Array.from({ length: boardDays }, (_, index) =>
       addDays(boardStartDate, index)
     );
-  }, [boardStartDate]);
+  }, [boardStartDate, boardDays]);
 
   const visibleRooms = useMemo(() => {
     if (!propertyId) {
@@ -541,7 +551,7 @@ export default function ReservationsPage() {
           >
             {properties.length > 1 && (
               <option value="">
-                All Properties
+                All Guesthouses
               </option>
             )}
 
@@ -594,7 +604,7 @@ export default function ReservationsPage() {
                   </strong>
 
                   <div style={boardSubtext}>
-                    {selectedProperty?.name ?? "All Properties"}
+                    {selectedProperty?.name ?? "All Guesthouses"}
                     {" · "}
                     {formatFriendlyDate(boardDates[0])}
                     {" - "}
@@ -605,6 +615,37 @@ export default function ReservationsPage() {
                 </div>
 
                 <div style={dateActions}>
+                  <label style={dateJumpControl}>
+                    <span style={dateJumpLabel}>Jump to</span>
+                    <input
+                      type="date"
+                      value={boardStartDate}
+                      onChange={(event) => {
+                        if (!event.target.value) return;
+                        setBoardStartDate(event.target.value);
+                        setDateSelection(null);
+                      }}
+                      style={dateJumpInput}
+                    />
+                  </label>
+                  <div style={rangeToggle}>
+                    {([7, 14, 30] as const).map((days) => (
+                      <button
+                        key={days}
+                        type="button"
+                        onClick={() => {
+                          setBoardDays(days);
+                          setDateSelection(null);
+                        }}
+                        style={{
+                          ...rangeButton,
+                          ...(boardDays === days ? activeRangeButton : {}),
+                        }}
+                      >
+                        {days} days
+                      </button>
+                    ))}
+                  </div>
                   <button
                     type="button"
                     onClick={previousPeriod}
@@ -725,7 +766,7 @@ export default function ReservationsPage() {
                       style={{
                         ...boardGrid,
                         gridTemplateColumns:
-                          `180px repeat(${boardDays}, 94px)`,
+                          `168px repeat(${boardDays}, ${boardDays === 7 ? 112 : boardDays === 14 ? 86 : 68}px)`,
                       }}
                     >
                       <div style={roomHeaderCell}>
@@ -740,6 +781,7 @@ export default function ReservationsPage() {
                             key={date}
                             style={{
                               ...dateHeaderCell,
+                              ...(isWeekend(date) ? weekendHeaderCell : {}),
                               ...(isToday
                                 ? todayHeaderCell
                                 : {}),
@@ -762,6 +804,34 @@ export default function ReservationsPage() {
                         );
                       })}
 
+                      <div style={availabilityLabelCell}>
+                        Availability
+                      </div>
+
+                      {boardDates.map((date) => {
+                        const available = Math.max(
+                          0,
+                          visibleRooms.length - countOccupiedRoomsForDate(
+                            visibleRooms,
+                            boardReservations,
+                            date,
+                          ),
+                        );
+
+                        return (
+                          <div
+                            key={`availability-${date}`}
+                            style={{
+                              ...availabilityCountCell,
+                              ...(date === today ? todayAvailabilityCell : {}),
+                            }}
+                            title={`${available} room${available === 1 ? "" : "s"} available`}
+                          >
+                            {available}
+                          </div>
+                        );
+                      })}
+
                       {visibleRooms.map((room) => (
                         <RoomBoardRow
                           key={room.id}
@@ -769,6 +839,12 @@ export default function ReservationsPage() {
                           dates={boardDates}
                           today={today}
                           dateSelection={dateSelection}
+                          propertyName={
+                            properties.find(
+                              (property) => property.id === room.property_id,
+                            )?.name ?? "Guesthouse"
+                          }
+                          showProperty={!propertyId}
                           findBooking={findBooking}
                           onDateClick={handleDateClick}
                         />
@@ -1021,6 +1097,8 @@ function RoomBoardRow({
   dates,
   today,
   dateSelection,
+  propertyName,
+  showProperty,
   findBooking,
   onDateClick,
 }: {
@@ -1028,6 +1106,8 @@ function RoomBoardRow({
   dates: string[];
   today: string;
   dateSelection: DateSelection | null;
+  propertyName: string;
+  showProperty: boolean;
 
   findBooking: (
     roomId: string,
@@ -1060,6 +1140,7 @@ function RoomBoardRow({
         </strong>
 
         <div style={roomTypeText}>
+          {showProperty ? `${propertyName} · ` : ""}
           {room.room_types?.name ?? "Room"}
 
           {room.room_name
@@ -1106,6 +1187,8 @@ function RoomBoardRow({
               }
               style={{
                 ...availableRoomButton,
+
+                ...(isWeekend(date) ? weekendRoomCell : {}),
 
                 ...(date === today
                   ? todayRoomCell
@@ -1531,6 +1614,11 @@ function formatDayName(
   );
 }
 
+function isWeekend(value: string) {
+  const day = parseDate(value).getUTCDay();
+  return day === 0 || day === 6;
+}
+
 /* =====================================================
    NETPOS CRYSTAL RESERVATION STYLES
 ===================================================== */
@@ -1545,13 +1633,14 @@ const LIGHT_BLUE = "#EDF6FE";
 const LIGHT_GREEN = "#ECF8F2";
 
 const pageStyle: React.CSSProperties = {
-  maxWidth: 1600,
-  margin: "0 auto",
+  width: "100%",
+  height: "calc(100vh - 142px)",
+  overflow: "auto",
+  margin: 0,
   padding: "8px 14px 10px",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: "Inter, Segoe UI, Arial, sans-serif",
   color: TEXT,
-  background: "linear-gradient(180deg,#F7FAFD 0%,#F5F8FB 100%)",
-  minHeight: "calc(100vh - 100px)",
+  background: "linear-gradient(180deg,#E9EEF3 0%,#F7F9FB 100%)",
   boxSizing: "border-box",
 };
 
@@ -1724,32 +1813,89 @@ const boardToolbar: React.CSSProperties = {
   justifyContent: "space-between",
   alignItems: "center",
   gap: 12,
-  border: `1px solid ${BORDER}`,
+  border: "1px solid #173F68",
   borderRadius: "10px 10px 0 0",
   padding: "7px 10px",
-  background: "linear-gradient(90deg,#F8FBFD 0%,#FFFFFF 100%)",
+  background: "linear-gradient(105deg,#102F50 0%,#194F7D 70%,#246A92 100%)",
+  boxShadow: "0 7px 18px rgba(8,31,52,.16)",
 };
 
 const boardTitle: React.CSSProperties = {
   fontSize: 11,
-  color: DARK_BLUE,
+  color: "#FFFFFF",
 };
 
 const boardSubtext: React.CSSProperties = {
-  color: MUTED,
+  color: "#C8DAE9",
   fontSize: 7.5,
   marginTop: 3,
 };
 
 const dateActions: React.CSSProperties = {
   display: "flex",
+  alignItems: "center",
   gap: 5,
 };
 
-const dateButton: React.CSSProperties = {
-  border: "1px solid #C5D7E4",
+const dateJumpControl: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 5,
+  padding: "3px 5px 3px 8px",
+  border: "1px solid rgba(255,255,255,.24)",
+  borderRadius: 7,
+  background: "rgba(255,255,255,.1)",
+};
+
+const dateJumpLabel: React.CSSProperties = {
+  color: "#D7E5F0",
+  fontSize: 6.5,
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: 0.35,
+};
+
+const dateJumpInput: React.CSSProperties = {
+  width: 108,
+  border: 0,
+  borderRadius: 5,
+  padding: "4px 6px",
   background: "#FFFFFF",
-  color: BLUE,
+  color: "#173B5C",
+  fontSize: 7.5,
+  fontWeight: 800,
+};
+
+const rangeToggle: React.CSSProperties = {
+  display: "flex",
+  padding: 2,
+  marginRight: 4,
+  border: "1px solid rgba(255,255,255,.22)",
+  borderRadius: 7,
+  background: "rgba(5,22,37,.24)",
+};
+
+const rangeButton: React.CSSProperties = {
+  border: 0,
+  borderRadius: 5,
+  padding: "5px 7px",
+  background: "transparent",
+  color: "#D5E4EF",
+  fontSize: 7,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const activeRangeButton: React.CSSProperties = {
+  background: "#FFFFFF",
+  color: "#123F68",
+  boxShadow: "0 1px 4px rgba(8,32,52,.14)",
+};
+
+const dateButton: React.CSSProperties = {
+  border: "1px solid rgba(255,255,255,.28)",
+  background: "rgba(255,255,255,.1)",
+  color: "#FFFFFF",
   borderRadius: 6,
   padding: "6px 8px",
   fontSize: 7.5,
@@ -1759,9 +1905,9 @@ const dateButton: React.CSSProperties = {
 
 const todayButton: React.CSSProperties = {
   ...dateButton,
-  background: BLUE,
-  color: "#FFFFFF",
-  borderColor: BLUE,
+  background: "#FFFFFF",
+  color: "#123F68",
+  borderColor: "#FFFFFF",
 };
 
 const selectionInstruction: React.CSSProperties = {
@@ -1901,7 +2047,7 @@ const dateHeaderCell: React.CSSProperties = {
   flexDirection: "column",
   justifyContent: "center",
   alignItems: "center",
-  background: "#F4F8FB",
+  background: "#EDF1F4",
   borderRight: "1px solid #DCE6EE",
   borderBottom: "1px solid #C8D9E6",
   color: TEXT,
@@ -1909,8 +2055,13 @@ const dateHeaderCell: React.CSSProperties = {
 };
 
 const todayHeaderCell: React.CSSProperties = {
-  background: "#E3F1FC",
+  background: "#D8E9F6",
   color: DARK_BLUE,
+};
+
+const weekendHeaderCell: React.CSSProperties = {
+  background: "#E3E7EB",
+  color: "#314454",
 };
 
 const dayName: React.CSSProperties = {
@@ -1924,6 +2075,42 @@ const todayText: React.CSSProperties = {
   fontSize: 5.5,
   fontWeight: 900,
   marginTop: 2,
+};
+
+const availabilityLabelCell: React.CSSProperties = {
+  position: "sticky",
+  left: 0,
+  zIndex: 4,
+  minHeight: 25,
+  display: "flex",
+  alignItems: "center",
+  padding: "3px 9px",
+  borderRight: "1px solid #BBD0DE",
+  borderBottom: "1px solid #BBD0DE",
+  background: "#E3EDF4",
+  color: "#345670",
+  fontSize: 6.5,
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: 0.4,
+};
+
+const availabilityCountCell: React.CSSProperties = {
+  minHeight: 25,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRight: "1px solid #D6E2E9",
+  borderBottom: "1px solid #BBD0DE",
+  background: "#E9F5F1",
+  color: "#117358",
+  fontSize: 8,
+  fontWeight: 900,
+};
+
+const todayAvailabilityCell: React.CSSProperties = {
+  background: "#CFE9E1",
+  color: "#075E48",
 };
 
 const roomNameCell: React.CSSProperties = {
@@ -1980,6 +2167,10 @@ const todayRoomCell: React.CSSProperties = {
   background: "#F8FCFF",
 };
 
+const weekendRoomCell: React.CSSProperties = {
+  background: "#F4F6F8",
+};
+
 const possibleCheckoutCell: React.CSSProperties = {
   background: "#F0F7FD",
 };
@@ -2025,7 +2216,7 @@ const availablePlus: React.CSSProperties = {
 const bookingCell: React.CSSProperties = {
   minHeight: 42,
   border: 0,
-  borderRight: "1px solid rgba(0,0,0,.06)",
+  borderRight: "1px solid rgba(255,255,255,.32)",
   borderBottom: "1px solid #E8EEF3",
   padding: "5px 6px",
   cursor: "pointer",
@@ -2053,21 +2244,21 @@ const continuationMark: React.CSSProperties = {
 };
 
 const confirmedCell: React.CSSProperties = {
-  background: "#E8F3FC",
-  color: "#0D5FA8",
-  borderColor: "#B9D5EA",
+  background: "#BFE7DB",
+  color: "#115E4D",
+  borderColor: "#8CCBB8",
 };
 
 const checkedInCell: React.CSSProperties = {
-  background: "#EAF8F1",
-  color: "#14714C",
-  borderColor: "#B8DDCA",
+  background: "#B9E1F2",
+  color: "#0A587B",
+  borderColor: "#80C4DF",
 };
 
 const provisionalCell: React.CSSProperties = {
-  background: "#F1F5F8",
-  color: "#5E7385",
-  borderColor: "#CEDAE3",
+  background: "#DCD8F3",
+  color: "#554A8A",
+  borderColor: "#B9B1DF",
 };
 
 const availableLegend: React.CSSProperties = {
@@ -2208,4 +2399,3 @@ const rowGrid: React.CSSProperties = {
   color: TEXT,
   cursor: "pointer",
 };
-

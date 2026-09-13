@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabase";
+import { selectInitialProperty } from "@/src/lib/propertyScope";
 
 type Property = {
   id: string;
@@ -20,6 +21,14 @@ type RatePlan = {
   end_date: string | null;
   priority: number;
   is_active: boolean;
+  applies_monday: boolean;
+  applies_tuesday: boolean;
+  applies_wednesday: boolean;
+  applies_thursday: boolean;
+  applies_friday: boolean;
+  applies_saturday: boolean;
+  applies_sunday: boolean;
+  room_rates: Array<{ room_type_id: string }>;
 };
 
 export default function RatesPage() {
@@ -60,24 +69,52 @@ export default function RatesPage() {
   // INITIAL DATA
   // =========================================================
 
-  useEffect(() => {
-    loadProperties();
-  }, []);
+  const loadRoomTypes = useCallback(async (selectedPropertyId: string) => {
+    const { data, error } = await supabase
+      .from("room_types")
+      .select("id,name")
+      .eq("property_id", selectedPropertyId)
+      .order("name");
 
-  useEffect(() => {
-    setRoomTypeId("");
-
-    if (!propertyId) {
-      setRoomTypes([]);
-      setRatePlans([]);
+    if (error) {
+      alert(error.message);
       return;
     }
 
-    loadRoomTypes();
-    loadRatePlans();
-  }, [propertyId]);
+    setRoomTypes(data ?? []);
+  }, []);
 
-  async function loadProperties() {
+  const loadRatePlans = useCallback(async (selectedPropertyId: string) => {
+    const { data, error } = await supabase
+      .from("rate_plans")
+      .select(`
+        id,
+        name,
+        start_date,
+        end_date,
+        priority,
+        is_active,
+        applies_monday,
+        applies_tuesday,
+        applies_wednesday,
+        applies_thursday,
+        applies_friday,
+        applies_saturday,
+        applies_sunday,
+        room_rates (room_type_id)
+      `)
+      .eq("property_id", selectedPropertyId)
+      .order("priority", { ascending: false });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setRatePlans((data as RatePlan[]) ?? []);
+  }, []);
+
+  const loadProperties = useCallback(async () => {
     const { data, error } = await supabase
       .from("properties")
       .select("id,name")
@@ -88,50 +125,24 @@ export default function RatesPage() {
       return;
     }
 
-    setProperties(data ?? []);
+    const { scoped, selected } = selectInitialProperty((data as Property[]) ?? []);
+    setProperties(scoped);
+    setPropertyId(selected);
+    if (selected) await Promise.all([loadRoomTypes(selected), loadRatePlans(selected)]);
+  }, [loadRatePlans, loadRoomTypes]);
 
-    if (data && data.length === 1) {
-      setPropertyId(data[0].id);
-    }
-  }
+  useEffect(() => {
+    // Load after the authenticated property scope is available.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadProperties();
+  }, [loadProperties]);
 
-  async function loadRoomTypes() {
-    const { data, error } = await supabase
-      .from("room_types")
-      .select("id,name")
-      .eq("property_id", propertyId)
-      .order("name");
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setRoomTypes(data ?? []);
-  }
-
-  async function loadRatePlans() {
-    const { data, error } = await supabase
-      .from("rate_plans")
-      .select(`
-        id,
-        name,
-        start_date,
-        end_date,
-        priority,
-        is_active
-      `)
-      .eq("property_id", propertyId)
-      .order("priority", {
-        ascending: false,
-      });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setRatePlans(data ?? []);
+  async function changeProperty(selectedPropertyId: string) {
+    setPropertyId(selectedPropertyId);
+    setRoomTypeId("");
+    setMessage("");
+    if (!selectedPropertyId) { setRoomTypes([]); setRatePlans([]); return; }
+    await Promise.all([loadRoomTypes(selectedPropertyId), loadRatePlans(selectedPropertyId)]);
   }
 
   // =========================================================
@@ -194,15 +205,34 @@ export default function RatesPage() {
       return;
     }
 
+    if (!Number.isInteger(minimumNights) || minimumNights < 1) {
+      alert("Minimum nights must be a whole number of at least 1.");
+      return;
+    }
+
+    if (!Number.isInteger(priority) || priority < 1) {
+      alert("Priority must be a whole number of at least 1.");
+      return;
+    }
+
+    const selectedDays = [monday, tuesday, wednesday, thursday, friday, saturday, sunday];
+    const conflict = ratePlans.find((plan) => {
+      const planDays = [plan.applies_monday, plan.applies_tuesday, plan.applies_wednesday, plan.applies_thursday, plan.applies_friday, plan.applies_saturday, plan.applies_sunday];
+      return plan.is_active && plan.priority === priority && plan.room_rates.some((rate) => rate.room_type_id === roomTypeId) && dateRangesOverlap(startDate || null, endDate || null, plan.start_date, plan.end_date) && selectedDays.some((selected, index) => selected && planDays[index]);
+    });
+    if (conflict) {
+      alert(`Rate conflict: ${conflict.name} already applies to this room type on overlapping dates/days at priority ${priority}. Change the priority, dates or weekdays so Netpos always has one winning rate.`);
+      return;
+    }
+
     setSaving(true);
 
+    const dayCode = selectedDays.map((applies) => applies ? "1" : "0").join("");
     const planCode = `${planName
       .trim()
       .toUpperCase()
       .replace(/[^A-Z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "")}_${Date.now()
-      .toString()
-      .slice(-6)}`;
+      .replace(/^_+|_+$/g, "")}_${startDate || "ANY"}_${endDate || "ANY"}_${priority}_${dayCode}_${roomTypeId.slice(0, 8)}`;
 
     const { data: ratePlan, error: ratePlanError } =
       await supabase
@@ -293,7 +323,19 @@ export default function RatesPage() {
 
     resetForm();
 
-    await loadRatePlans();
+    await loadRatePlans(propertyId);
+  }
+
+  async function toggleRatePlan(rate: RatePlan) {
+    const nextActive = !rate.is_active;
+    const reason = window.prompt(`${nextActive ? "Reason for reactivating" : "Reason for deactivating"} ${rate.name}:`);
+    if (!reason?.trim()) return;
+    if (!window.confirm(`${nextActive ? "Reactivate" : "Deactivate"} ${rate.name}? Existing reservations and historical prices will not be changed.`)) return;
+    const { error } = await supabase.from("rate_plans").update({ is_active: nextActive }).eq("id", rate.id).eq("property_id", propertyId);
+    if (error) { alert(error.message); return; }
+    await supabase.from("audit_logs").insert({ property_id: propertyId, user_id: null, action: nextActive ? "rate_plan_reactivated" : "rate_plan_deactivated", entity_type: "rate_plan", entity_id: rate.id, old_values: { is_active: rate.is_active }, new_values: { is_active: nextActive }, reason: reason.trim() });
+    setMessage(`${rate.name} ${nextActive ? "reactivated" : "deactivated"}. Existing reservations were not changed.`);
+    await loadRatePlans(propertyId);
   }
 
   function resetForm() {
@@ -370,9 +412,7 @@ export default function RatesPage() {
           <Field label="Property">
             <select
               value={propertyId}
-              onChange={(event) =>
-                setPropertyId(event.target.value)
-              }
+              onChange={(event) => void changeProperty(event.target.value)}
               style={inputStyle}
             >
               <option value="">
@@ -895,7 +935,9 @@ export default function RatesPage() {
                     textAlign: "right",
                   }}
                 >
-                  Priority {rate.priority}
+                  <div>Priority {rate.priority}</div>
+                  <div style={{ marginTop: 4, color: rate.is_active ? "#168257" : "#8A4B32", fontWeight: 800 }}>{rate.is_active ? "ACTIVE" : "INACTIVE"}</div>
+                  <button type="button" onClick={() => void toggleRatePlan(rate)} style={rateToggleButton}>{rate.is_active ? "Deactivate" : "Reactivate"}</button>
                 </div>
               </div>
             ))}
@@ -942,16 +984,6 @@ function MoneyInput({
   value: number;
   setValue: (value: number) => void;
 }) {
-  const [textValue, setTextValue] = useState(
-    value === 0 ? "" : String(value)
-  );
-
-  useEffect(() => {
-    setTextValue(
-      value === 0 ? "" : String(value)
-    );
-  }, [value]);
-
   return (
     <div
       style={{
@@ -975,12 +1007,10 @@ function MoneyInput({
         type="number"
         min="0"
         step="0.01"
-        value={textValue}
+        value={value === 0 ? "" : String(value)}
         placeholder="0.00"
         onChange={(event) => {
           const text = event.target.value;
-
-          setTextValue(text);
 
           if (text === "") {
             setValue(0);
@@ -1061,6 +1091,16 @@ const successStyle: React.CSSProperties = {
   marginBottom: 20,
   fontWeight: 700,
 };
+
+const rateToggleButton: React.CSSProperties = { marginTop: 7, padding: "5px 8px", border: "1px solid #B9C9D6", borderRadius: 6, background: "#FFFFFF", color: "#0D5FA8", fontSize: 9, fontWeight: 800, cursor: "pointer" };
+
+function dateRangesOverlap(startA: string | null, endA: string | null, startB: string | null, endB: string | null) {
+  const aStart = startA || "0001-01-01";
+  const aEnd = endA || "9999-12-31";
+  const bStart = startB || "0001-01-01";
+  const bEnd = endB || "9999-12-31";
+  return aStart <= bEnd && bStart <= aEnd;
+}
 
 const previewLabel: React.CSSProperties = {
   display: "block",

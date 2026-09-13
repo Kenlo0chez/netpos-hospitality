@@ -53,6 +53,7 @@ type Property = {
 
   payment_reference_instruction: string | null;
   invoice_terms: string | null;
+  receipt_prefix: string | null;
 };
 
 type Reservation = {
@@ -106,6 +107,7 @@ type ReservationRoom = {
 
 type Room = {
   id: string;
+  room_type_id: string;
   room_number: string;
   housekeeping_status: string | null;
   operational_status: string | null;
@@ -127,6 +129,13 @@ type Payment = {
 
   notes: string | null;
   received_at: string;
+};
+
+type Receipt = {
+  id: string;
+  payment_id: string;
+  receipt_number: string;
+  issued_at: string;
 };
 
 type Invoice = {
@@ -252,10 +261,14 @@ export default function ReservationDetailsPage() {
     setRoomType,
   ] = useState<RoomType | null>(null);
 
+  const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
+
   const [
     payments,
     setPayments,
   ] = useState<Payment[]>([]);
+
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
 
   const [
     invoice,
@@ -354,6 +367,13 @@ export default function ReservationDetailsPage() {
     currentStaffRole,
     setCurrentStaffRole,
   ] = useState("");
+
+  const [showCorrectionModal, setShowCorrectionModal] = useState(false);
+  const [correctionArrival, setCorrectionArrival] = useState("");
+  const [correctionDeparture, setCorrectionDeparture] = useState("");
+  const [correctionRoomId, setCorrectionRoomId] = useState("");
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [savingCorrection, setSavingCorrection] = useState(false);
 
   const canProcessRefund =
     currentStaffRole === "owner" ||
@@ -499,7 +519,8 @@ export default function ReservationDetailsPage() {
           bank_account_number,
           bank_branch_code,
           payment_reference_instruction,
-          invoice_terms
+          invoice_terms,
+          receipt_prefix
         `)
         .eq(
           "id",
@@ -637,6 +658,7 @@ export default function ReservationDetailsPage() {
           .from("rooms")
           .select(`
             id,
+            room_type_id,
             room_number,
             housekeeping_status,
             operational_status
@@ -659,6 +681,19 @@ export default function ReservationDetailsPage() {
       } else {
         setRoom(null);
       }
+
+      const { data: propertyRooms, error: propertyRoomsError } = await supabase
+        .from("rooms")
+        .select("id,room_type_id,room_number,housekeeping_status,operational_status")
+        .eq("property_id", loadedReservation.property_id)
+        .eq("operational_status", "active")
+        .order("room_number");
+
+      if (propertyRoomsError) {
+        throw new Error(propertyRoomsError.message);
+      }
+
+      setAvailableRooms((propertyRooms as Room[]) ?? []);
 
       // -----------------------------------------------------
       // ROOM TYPE
@@ -747,9 +782,18 @@ export default function ReservationDetailsPage() {
       );
     }
 
-    setPayments(
-      (data as Payment[]) ?? []
-    );
+    const loadedPayments = (data as Payment[]) ?? [];
+    setPayments(loadedPayments);
+    if (!loadedPayments.length) {
+      setReceipts([]);
+      return;
+    }
+    const { data: receiptData, error: receiptError } = await supabase
+      .from("receipts")
+      .select("id,payment_id,receipt_number,issued_at")
+      .in("payment_id", loadedPayments.map((payment) => payment.id));
+    if (receiptError) throw new Error(receiptError.message);
+    setReceipts((receiptData as Receipt[]) ?? []);
   }
 
   // =========================================================
@@ -1043,15 +1087,61 @@ export default function ReservationDetailsPage() {
       return;
     }
 
+    if (
+      ["eft", "card"].includes(paymentMethod) &&
+      !paymentReference.trim()
+    ) {
+      alert("Enter the bank or card reference before saving this payment.");
+      return;
+    }
+
+    if (
+      transactionType !== "refund" &&
+      amount > balanceOutstanding + 0.009
+    ) {
+      alert(
+        `This payment is more than the outstanding balance of N$${balanceOutstanding.toFixed(2)}. Correct the amount or record the excess separately.`
+      );
+      return;
+    }
+
+    if (
+      transactionType === "refund" &&
+      amount > totalPaid + 0.009
+    ) {
+      alert(
+        `The refund cannot exceed the net amount received of N$${totalPaid.toFixed(2)}.`
+      );
+      return;
+    }
+
     setSavingPayment(true);
 
     try {
+      if (paymentReference.trim()) {
+        const { data: duplicate } = await supabase
+          .from("payments")
+          .select("id")
+          .eq("reservation_id", reservation.id)
+          .eq("payment_method", paymentMethod)
+          .eq("transaction_type", transactionType)
+          .eq("payment_reference", paymentReference.trim())
+          .eq("amount", amount)
+          .limit(1)
+          .maybeSingle();
+
+        if (duplicate) {
+          throw new Error("This payment reference and amount were already recorded for this reservation.");
+        }
+      }
+
       const tradingDayId =
         await getTradingDay(
           reservation.property_id
         );
 
       const {
+        data: createdPayment,
         error,
       } = await supabase
         .from("payments")
@@ -1089,13 +1179,39 @@ export default function ReservationDetailsPage() {
 
           received_at:
             new Date().toISOString(),
-        });
+        })
+        .select("id")
+        .single();
 
       if (error) {
         throw new Error(
           error.message
         );
       }
+
+      const revisedPaid = transactionType === "refund" ? totalPaid - amount : totalPaid + amount;
+      await syncInvoiceStatus(revisedPaid);
+
+      if (transactionType !== "refund" && createdPayment?.id) {
+        const { error: receiptError } = await supabase.from("receipts").insert({
+          property_id: reservation.property_id,
+          payment_id: createdPayment.id,
+          receipt_number: generateDocumentNumber(property?.receipt_prefix || "RCT"),
+        });
+        if (receiptError) console.error("Receipt creation:", receiptError.message);
+      }
+
+      await logReservationAction(
+        transactionType === "refund" ? "refund_recorded" : "payment_recorded",
+        {},
+        {
+          payment_method: paymentMethod,
+          transaction_type: transactionType,
+          amount,
+          reference: paymentReference.trim() || null,
+        },
+        paymentNotes.trim() || "Payment captured from guest folio",
+      );
 
       setShowPaymentModal(false);
 
@@ -1134,6 +1250,45 @@ export default function ReservationDetailsPage() {
       return;
     }
 
+    if (!reservationRoom?.room_id || !room) {
+      alert("Assign a physical room before checking in this guest.");
+      return;
+    }
+
+    if (room.operational_status !== "active") {
+      alert(`Room ${room.room_number} is out of service. Move the reservation to an active room before check-in.`);
+      return;
+    }
+
+    if (room.housekeeping_status !== "clean") {
+      alert(`Room ${room.room_number} is ${room.housekeeping_status || "not ready"}. Housekeeping must mark it Clean before check-in.`);
+      return;
+    }
+
+    const { data: possibleConflicts, error: conflictError } = await supabase
+      .from("reservation_rooms")
+      .select("reservation_id,reservations(status)")
+      .eq("room_id", reservationRoom.room_id)
+      .neq("reservation_id", reservation.id)
+      .lt("arrival_date", reservation.departure_date)
+      .gt("departure_date", reservation.arrival_date);
+
+    if (conflictError) {
+      alert(`Room availability could not be confirmed: ${conflictError.message}`);
+      return;
+    }
+
+    const hasConflict = ((possibleConflicts as unknown as Array<{
+      reservations: { status: string } | null;
+    }>) ?? []).some(
+      (item) => item.reservations && ["provisional", "confirmed", "checked_in"].includes(item.reservations.status),
+    );
+
+    if (hasConflict) {
+      alert(`Room ${room.room_number} now has another active reservation for these dates. Move this guest to an available room before check-in.`);
+      return;
+    }
+
     const confirmed =
       window.confirm(
         `Check in ${guestName()}?`
@@ -1168,6 +1323,13 @@ export default function ReservationDetailsPage() {
           error.message
         );
       }
+
+      await logReservationAction(
+        "guest_checked_in",
+        { status: "confirmed" },
+        { status: "checked_in", room_id: reservationRoom.room_id },
+        "Front desk check-in",
+      );
 
       await loadReservation(
         reservation.id
@@ -1206,6 +1368,13 @@ export default function ReservationDetailsPage() {
     if (
       balanceOutstanding > 0
     ) {
+      if (!["owner", "manager"].includes(currentStaffRole)) {
+        alert(
+          `Checkout is blocked because ${money(balanceOutstanding)} is still outstanding. A manager must settle the account or authorise the checkout.`
+        );
+        return;
+      }
+
       const continueCheckout =
         window.confirm(
           `The reservation still has a balance of N$${balanceOutstanding.toFixed(
@@ -1312,6 +1481,15 @@ export default function ReservationDetailsPage() {
         }
       }
 
+      await logReservationAction(
+        "guest_checked_out",
+        { status: "checked_in", balance_outstanding: balanceOutstanding },
+        { status: "checked_out", room_status: "dirty" },
+        balanceOutstanding > 0
+          ? `Manager-authorised checkout with ${money(balanceOutstanding)} outstanding`
+          : "Front desk checkout",
+      );
+
       // -----------------------------------------------------
       // 3. RELOAD
       // -----------------------------------------------------
@@ -1340,6 +1518,270 @@ export default function ReservationDetailsPage() {
     }
   }
 
+  function openStayCorrection() {
+    if (!reservation || !reservationRoom) return;
+    setCorrectionArrival(reservation.arrival_date);
+    setCorrectionDeparture(reservation.departure_date);
+    setCorrectionRoomId(reservationRoom.room_id ?? "");
+    setCorrectionReason("");
+    setShowCorrectionModal(true);
+  }
+
+  async function logReservationAction(
+    action: string,
+    oldValues: Record<string, unknown>,
+    newValues: Record<string, unknown>,
+    reason: string,
+  ) {
+    if (!reservation) return;
+    const { error } = await supabase.from("audit_logs").insert({
+      property_id: reservation.property_id,
+      user_id: null,
+      action,
+      entity_type: "reservation",
+      entity_id: reservation.id,
+      old_values: oldValues,
+      new_values: newValues,
+      reason,
+    });
+    if (error) console.error("Audit log:", error.message);
+  }
+
+  async function saveStayCorrection(event: FormEvent) {
+    event.preventDefault();
+    if (!reservation || !reservationRoom) return;
+    if (!correctionArrival || !correctionDeparture || correctionDeparture <= correctionArrival) {
+      alert("Check-out must be after check-in.");
+      return;
+    }
+    if (!correctionRoomId) {
+      alert("Select a physical room.");
+      return;
+    }
+    if (!correctionReason.trim()) {
+      alert("Enter the reason for changing the stay.");
+      return;
+    }
+
+    const targetRoom = availableRooms.find((item) => item.id === correctionRoomId);
+    if (!targetRoom) {
+      alert("The selected room is not active.");
+      return;
+    }
+    if (targetRoom.room_type_id !== reservationRoom.room_type_id) {
+      alert("Select a room of the same room type so the agreed rate remains correct.");
+      return;
+    }
+    if (
+      reservation.status === "checked_in" &&
+      correctionRoomId !== reservationRoom.room_id &&
+      targetRoom.housekeeping_status !== "clean"
+    ) {
+      alert(`Room ${targetRoom.room_number} must be Clean before moving an in-house guest.`);
+      return;
+    }
+
+    setSavingCorrection(true);
+    try {
+      const { data: possibleConflicts, error: conflictError } = await supabase
+        .from("reservation_rooms")
+        .select("reservation_id,arrival_date,departure_date,reservations(status)")
+        .eq("room_id", correctionRoomId)
+        .neq("reservation_id", reservation.id)
+        .lt("arrival_date", correctionDeparture)
+        .gt("departure_date", correctionArrival);
+
+      if (conflictError) throw new Error(conflictError.message);
+      const hasConflict = ((possibleConflicts as unknown as Array<{ reservations: { status: string } | null }>) ?? [])
+        .some((item) => item.reservations && ["provisional", "confirmed", "checked_in"].includes(item.reservations.status));
+      if (hasConflict) {
+        throw new Error(`Room ${targetRoom.room_number} is already booked during the selected dates.`);
+      }
+
+      const newNights = calculateNights(correctionArrival, correctionDeparture);
+      const newSubtotal = newNights * Number(reservationRoom.nightly_rate);
+      const newTotal = Math.max(0, newSubtotal - Number(reservation.discount_amount ?? 0));
+      const vatRate = Number(property?.vat_rate ?? 15);
+      const newVat = vatRate > 0 ? newTotal - newTotal / (1 + vatRate / 100) : 0;
+      const oldValues = {
+        arrival_date: reservation.arrival_date,
+        departure_date: reservation.departure_date,
+        room_id: reservationRoom.room_id,
+        total_amount: reservation.total_amount,
+      };
+
+      const { error: reservationError } = await supabase
+        .from("reservations")
+        .update({
+          arrival_date: correctionArrival,
+          departure_date: correctionDeparture,
+          subtotal: newSubtotal,
+          vat_amount: newVat,
+          total_amount: newTotal,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", reservation.id);
+      if (reservationError) throw new Error(reservationError.message);
+
+      const { error: roomError } = await supabase
+        .from("reservation_rooms")
+        .update({
+          room_id: correctionRoomId,
+          arrival_date: correctionArrival,
+          departure_date: correctionDeparture,
+        })
+        .eq("id", reservationRoom.id);
+      if (roomError) {
+        await supabase.from("reservations").update({
+          arrival_date: reservation.arrival_date,
+          departure_date: reservation.departure_date,
+          subtotal: reservation.subtotal,
+          vat_amount: reservation.vat_amount,
+          total_amount: reservation.total_amount,
+        }).eq("id", reservation.id);
+        throw new Error(roomError.message);
+      }
+
+      if (
+        reservation.status === "checked_in" &&
+        correctionRoomId !== reservationRoom.room_id &&
+        reservationRoom.room_id
+      ) {
+        const { error: oldRoomError } = await supabase
+          .from("rooms")
+          .update({ housekeeping_status: "dirty" })
+          .eq("id", reservationRoom.room_id);
+        if (oldRoomError) {
+          await supabase.from("reservation_rooms").update({
+            room_id: reservationRoom.room_id,
+            arrival_date: reservation.arrival_date,
+            departure_date: reservation.departure_date,
+          }).eq("id", reservationRoom.id);
+          await supabase.from("reservations").update({
+            arrival_date: reservation.arrival_date,
+            departure_date: reservation.departure_date,
+            subtotal: reservation.subtotal,
+            vat_amount: reservation.vat_amount,
+            total_amount: reservation.total_amount,
+          }).eq("id", reservation.id);
+          throw new Error(`The guest was not moved because the old room could not be released to housekeeping: ${oldRoomError.message}`);
+        }
+      }
+
+      await logReservationAction("stay_corrected", oldValues, {
+        arrival_date: correctionArrival,
+        departure_date: correctionDeparture,
+        room_id: correctionRoomId,
+        total_amount: newTotal,
+      }, correctionReason.trim());
+      setShowCorrectionModal(false);
+      await loadReservation(reservation.id);
+      setMessage(`Stay updated successfully. New total: ${money(newTotal)}.`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Could not update the stay.");
+    } finally {
+      setSavingCorrection(false);
+    }
+  }
+
+  async function reopenCheckout() {
+    if (!reservation || reservation.status !== "checked_out" || !["owner", "manager"].includes(currentStaffRole)) return;
+    const reason = window.prompt("Why is this checkout being reopened? This reason will be kept in the audit history.");
+    if (!reason?.trim()) {
+      if (reason !== null) alert("A reason is required.");
+      return;
+    }
+    if (!window.confirm(`Reopen ${reservation.reservation_number} as Checked In?`)) return;
+    setUpdating(true);
+    try {
+      if (!reservationRoom?.room_id) {
+        throw new Error("This checkout cannot be reopened until a physical room is assigned.");
+      }
+      const targetRoom = availableRooms.find((item) => item.id === reservationRoom.room_id);
+      if (!targetRoom || targetRoom.operational_status !== "active") {
+        throw new Error("The original room is out of service. Assign an active room before reopening this stay.");
+      }
+      const { data: possibleConflicts, error: conflictError } = await supabase
+        .from("reservation_rooms")
+        .select("reservation_id,reservations(status)")
+        .eq("room_id", reservationRoom.room_id)
+        .neq("reservation_id", reservation.id)
+        .lt("arrival_date", reservation.departure_date)
+        .gt("departure_date", reservation.arrival_date);
+      if (conflictError) throw new Error(conflictError.message);
+      const hasConflict = ((possibleConflicts as unknown as Array<{
+        reservations: { status: string } | null;
+      }>) ?? []).some(
+        (item) => item.reservations && ["provisional", "confirmed", "checked_in"].includes(item.reservations.status),
+      );
+      if (hasConflict) {
+        throw new Error(`Room ${targetRoom.room_number} has already been allocated to another active reservation. The checkout cannot be reopened.`);
+      }
+      const { error } = await supabase.from("reservations").update({
+        status: "checked_in",
+        checked_out_at: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", reservation.id);
+      if (error) throw new Error(error.message);
+      const { error: roomError } = await supabase
+        .from("rooms")
+        .update({ housekeeping_status: "clean" })
+        .eq("id", reservationRoom.room_id);
+      if (roomError) {
+        await supabase.from("reservations").update({
+          status: "checked_out",
+          checked_out_at: reservation.checked_out_at,
+        }).eq("id", reservation.id);
+        throw new Error(`The checkout was not reopened because the room status could not be restored: ${roomError.message}`);
+      }
+      await logReservationAction("checkout_reopened", { status: "checked_out" }, { status: "checked_in" }, reason.trim());
+      await loadReservation(reservation.id);
+      setMessage("Checkout reopened and the guest is back In House.");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Could not reopen checkout.");
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function reversePayment(payment: Payment) {
+    if (!reservation || !["owner", "manager"].includes(currentStaffRole)) return;
+    const reason = window.prompt("Enter the reason for reversing this transaction.");
+    if (!reason?.trim()) {
+      if (reason !== null) alert("A reversal reason is required.");
+      return;
+    }
+    if (!window.confirm(`Reverse ${money(payment.amount)} ${formatPaymentMethod(payment.payment_method)} transaction?`)) return;
+    try {
+      const marker = `Reversal of payment ${payment.id}`;
+      const { data: existing } = await supabase.from("payments").select("id").eq("reservation_id", reservation.id).ilike("notes", `%${marker}%`).limit(1);
+      if (existing?.length) throw new Error("This transaction has already been reversed.");
+      const tradingDayId = await getTradingDay(reservation.property_id);
+      const reversalType = payment.transaction_type === "refund" ? "payment" : "refund";
+      const { error } = await supabase.from("payments").insert({
+        property_id: reservation.property_id,
+        trading_day_id: tradingDayId,
+        reservation_id: reservation.id,
+        guest_id: reservation.guest_id,
+        company_id: reservation.company_id,
+        payment_reference: `REV-${payment.payment_reference || payment.id.slice(0, 8)}`,
+        payment_method: payment.payment_method,
+        transaction_type: reversalType,
+        amount: payment.amount,
+        notes: `${marker}. Reason: ${reason.trim()}`,
+        received_at: new Date().toISOString(),
+      });
+      if (error) throw new Error(error.message);
+      const revisedPaid = reversalType === "refund" ? totalPaid - Number(payment.amount) : totalPaid + Number(payment.amount);
+      await syncInvoiceStatus(revisedPaid);
+      await logReservationAction("payment_reversed", { payment_id: payment.id }, { transaction_type: reversalType, amount: payment.amount }, reason.trim());
+      await loadPayments(reservation.id);
+      setMessage("Payment reversal recorded. The original transaction remains in history.");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Could not reverse payment.");
+    }
+  }
+
   // =========================================================
   // CANCEL
   // =========================================================
@@ -1360,9 +1802,29 @@ export default function ReservationDetailsPage() {
       return;
     }
 
+    const reason = window.prompt(
+      "Enter the cancellation reason. This is required and will remain in the reservation history."
+    );
+    if (!reason?.trim()) {
+      if (reason !== null) alert("A cancellation reason is required.");
+      return;
+    }
+
+    let depositTreatment = "No payment received";
+    if (totalPaid > 0) {
+      const treatment = window.prompt(
+        `Net payments received: ${money(totalPaid)}. Enter deposit treatment: REFUND, RETAIN or TRANSFER.`
+      )?.trim().toUpperCase();
+      if (!treatment || !["REFUND", "RETAIN", "TRANSFER"].includes(treatment)) {
+        alert("Enter REFUND, RETAIN or TRANSFER so the deposit is handled clearly.");
+        return;
+      }
+      depositTreatment = treatment;
+    }
+
     const confirmed =
       window.confirm(
-        `Cancel reservation ${reservation.reservation_number} for ${guestName()}?\n\nThe room will become available again on the calendar.`
+        `Cancel reservation ${reservation.reservation_number} for ${guestName()}?\n\nReason: ${reason.trim()}\nDeposit: ${depositTreatment}\n\nThe room will become available again on the calendar.`
       );
 
     if (!confirmed) {
@@ -1391,6 +1853,8 @@ export default function ReservationDetailsPage() {
 
           cancelled_trading_day_id:
             tradingDayId,
+
+          notes: `${reservation.notes ? `${reservation.notes}\n` : ""}Cancellation: ${reason.trim()}. Deposit treatment: ${depositTreatment}.`,
         })
         .eq(
           "id",
@@ -1402,6 +1866,13 @@ export default function ReservationDetailsPage() {
           error.message
         );
       }
+
+      await logReservationAction(
+        "reservation_cancelled",
+        { status: reservation.status, net_payments: totalPaid },
+        { status: "cancelled", deposit_treatment: depositTreatment },
+        reason.trim(),
+      );
 
       await loadReservation(
         reservation.id
@@ -1436,9 +1907,17 @@ export default function ReservationDetailsPage() {
       return;
     }
 
+    const reason = window.prompt(
+      "Enter the no-show reason or contact outcome. This is required for the history."
+    );
+    if (!reason?.trim()) {
+      if (reason !== null) alert("A no-show reason is required.");
+      return;
+    }
+
     const confirmed =
       window.confirm(
-        `Mark ${guestName()} as NO SHOW?\n\nReservation: ${reservation.reservation_number}\n\nThe reservation remains recorded, but the room will be released on the availability calendar.`
+        `Mark ${guestName()} as NO SHOW?\n\nReservation: ${reservation.reservation_number}\nReason: ${reason.trim()}\n\nThe reservation remains recorded, but the room will be released on the availability calendar.`
       );
 
     if (!confirmed) {
@@ -1456,6 +1935,8 @@ export default function ReservationDetailsPage() {
         .update({
           status:
             "no_show",
+
+          notes: `${reservation.notes ? `${reservation.notes}\n` : ""}No show: ${reason.trim()}.`,
         })
         .eq(
           "id",
@@ -1467,6 +1948,13 @@ export default function ReservationDetailsPage() {
           error.message
         );
       }
+
+      await logReservationAction(
+        "reservation_no_show",
+        { status: reservation.status },
+        { status: "no_show" },
+        reason.trim(),
+      );
 
       await loadReservation(
         reservation.id
@@ -1492,6 +1980,19 @@ export default function ReservationDetailsPage() {
   // GENERATE INVOICE
   // =========================================================
 
+  async function syncInvoiceStatus(netPaid: number) {
+    if (!invoice) return;
+    const invoiceTotal = Number(invoice.total_amount ?? 0);
+    const status = netPaid >= invoiceTotal - 0.005 ? "paid" : netPaid > 0.005 ? "part_paid" : "issued";
+    if (status === invoice.status) return;
+    const { error } = await supabase.from("invoices").update({ status }).eq("id", invoice.id).neq("status", "void");
+    if (error) {
+      console.error("Invoice status sync:", error.message);
+      return;
+    }
+    setInvoice((current) => current ? { ...current, status } : current);
+  }
+
   async function generateInvoice() {
     if (
       !reservation ||
@@ -1501,6 +2002,11 @@ export default function ReservationDetailsPage() {
     }
 
     if (invoice) {
+      if (Math.abs(Number(invoice.total_amount) - Number(reservation.total_amount)) > 0.005) {
+        alert(`Invoice ${invoice.invoice_number} is for ${money(invoice.total_amount)}, but the current stay is ${money(reservation.total_amount)}. A manager or owner must void it before generating the corrected invoice.`);
+        return;
+      }
+      await syncInvoiceStatus(totalPaid);
       openInvoicePDF();
       return;
     }
@@ -1508,6 +2014,21 @@ export default function ReservationDetailsPage() {
     setGeneratingInvoice(true);
 
     try {
+      const { data: existingInvoice, error: existingInvoiceError } = await supabase
+        .from("invoices")
+        .select("id,invoice_number")
+        .eq("reservation_id", reservation.id)
+        .neq("status", "void")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (existingInvoiceError) throw new Error(existingInvoiceError.message);
+      if (existingInvoice) {
+        await loadInvoice(reservation.id);
+        setMessage(`Invoice ${existingInvoice.invoice_number} already exists. Netpos prevented a duplicate invoice.`);
+        return;
+      }
+
       const invoiceNumber =
         generateDocumentNumber(
           "INV"
@@ -1713,6 +2234,29 @@ export default function ReservationDetailsPage() {
     }
   }
 
+  async function voidInvoice() {
+    if (!invoice || !reservation || !["owner", "manager"].includes(currentStaffRole)) return;
+    const reason = window.prompt(`Reason for voiding invoice ${invoice.invoice_number}:`);
+    if (!reason?.trim()) {
+      if (reason !== null) alert("A void reason is required.");
+      return;
+    }
+    if (!window.confirm(`Void ${invoice.invoice_number}? The invoice and its line items will remain in history, and a corrected invoice can then be generated.`)) return;
+    setGeneratingInvoice(true);
+    try {
+      const { error } = await supabase.from("invoices").update({ status: "void", notes: `${invoice.notes ? `${invoice.notes}\n` : ""}Voided: ${reason.trim()}` }).eq("id", invoice.id).neq("status", "void");
+      if (error) throw new Error(error.message);
+      await logReservationAction("invoice_voided", { invoice_id: invoice.id, invoice_number: invoice.invoice_number, status: invoice.status }, { status: "void" }, reason.trim());
+      setInvoice(null);
+      setInvoiceItems([]);
+      setMessage(`Invoice ${invoice.invoice_number} voided. You can now generate the corrected tax invoice.`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Could not void the invoice.");
+    } finally {
+      setGeneratingInvoice(false);
+    }
+  }
+
   // =========================================================
   // CONFIRMATION DOCUMENT
   // =========================================================
@@ -1800,6 +2344,11 @@ export default function ReservationDetailsPage() {
           roomType?.name ?? "-"
         )}
 
+        ${documentRow(
+          "Reservation Status",
+          formatStatus(reservation.status)
+        )}
+
       </div>
 
       <div class="section">
@@ -1843,9 +2392,9 @@ export default function ReservationDetailsPage() {
         )}
 
         ${documentRow(
-          "Balance",
+          balanceOutstanding < -0.005 ? "Credit" : "Balance",
           money(
-            balanceOutstanding
+            Math.abs(balanceOutstanding)
           ),
           true
         )}
@@ -1918,6 +2467,7 @@ export default function ReservationDetailsPage() {
           `
         )
         .join("");
+    const invoiceBalance = Number(selectedInvoice.total_amount) - totalPaid;
 
     const html = `
       ${documentHeader(
@@ -1942,6 +2492,11 @@ export default function ReservationDetailsPage() {
           formatFriendlyDate(
             selectedInvoice.invoice_date
           )
+        )}
+
+        ${documentRow(
+          "Status",
+          formatInvoiceStatus(selectedInvoice.status)
         )}
 
       </div>
@@ -2004,9 +2559,9 @@ export default function ReservationDetailsPage() {
         )}
 
         ${documentRow(
-          "Balance",
+          invoiceBalance < -0.005 ? "Credit" : "Balance",
           money(
-            balanceOutstanding
+            Math.abs(invoiceBalance)
           ),
           true
         )}
@@ -2138,9 +2693,9 @@ export default function ReservationDetailsPage() {
         )}
 
         ${documentRow(
-          "BALANCE DUE",
+          balanceOutstanding < -0.005 ? "CREDIT" : "BALANCE DUE",
           money(
-            balanceOutstanding
+            Math.abs(balanceOutstanding)
           ),
           true
         )}
@@ -2182,124 +2737,47 @@ export default function ReservationDetailsPage() {
   // PAYMENT RECEIPT
   // =========================================================
 
-  function openReceiptPDF() {
-    if (
-      !reservation ||
-      payments.length === 0
-    ) {
-      alert(
-        "No payment has been recorded yet."
-      );
-
+  async function openReceiptPDF(selectedPayment?: Payment) {
+    if (!reservation) return;
+    const payment = selectedPayment ?? payments.find((item) => item.transaction_type !== "refund");
+    if (!payment) {
+      alert("No receiptable payment has been recorded yet. Refunds and reversals appear on the guest statement instead.");
       return;
     }
 
-    const paymentRows =
-      payments
-        .map(
-          (payment) => `
-            <tr>
-              <td>
-                ${escapeHtml(
-                  formatDateTime(
-                    payment.received_at
-                  )
-                )}
-              </td>
+    let receipt = receipts.find((item) => item.payment_id === payment.id) ?? null;
+    if (!receipt) {
+      const { data, error } = await supabase.from("receipts").insert({
+        property_id: reservation.property_id,
+        payment_id: payment.id,
+        receipt_number: generateDocumentNumber(property?.receipt_prefix || "RCT"),
+      }).select("id,payment_id,receipt_number,issued_at").single();
+      if (error) {
+        alert(`The numbered receipt could not be created: ${error.message}`);
+        return;
+      }
+      receipt = data as Receipt;
+      setReceipts((current) => [...current, receipt as Receipt]);
+    }
 
-              <td>
-                ${escapeHtml(
-                  formatPaymentMethod(
-                    payment.payment_method
-                  )
-                )}
-              </td>
-
-              <td>
-                ${escapeHtml(
-                  payment.payment_reference ??
-                    "-"
-                )}
-              </td>
-
-              <td class="right">
-                ${
-                  payment.transaction_type ===
-                  "refund"
-                    ? "-"
-                    : ""
-                }${escapeHtml(
-                  money(payment.amount)
-                )}
-              </td>
-            </tr>
-          `
-        )
-        .join("");
-
+    const currentBalance = Number(reservation.total_amount) - totalPaid;
     const html = `
-      ${documentHeader(
-        "PAYMENT RECEIPT",
-        reservation.reservation_number
-      )}
-
+      ${documentHeader("PAYMENT RECEIPT", receipt.receipt_number)}
       <div class="section">
-        ${documentRow(
-          "Received From",
-          guestName()
-        )}
-
-        ${documentRow(
-          "Reservation",
-          reservation.reservation_number
-        )}
-
-        ${documentRow(
-          "Net Amount Received",
-          money(totalPaid),
-          true
-        )}
+        ${documentRow("Received From", guestName())}
+        ${documentRow("Reservation", reservation.reservation_number)}
+        ${documentRow("Payment Date", formatDateTime(payment.received_at))}
+        ${documentRow("Payment Method", formatPaymentMethod(payment.payment_method))}
+        ${documentRow("Reference", payment.payment_reference ?? "-")}
+        ${documentRow("Amount Received", money(payment.amount), true)}
       </div>
-
       <div class="section">
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Method</th>
-              <th>Reference</th>
-              <th class="right">Amount</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            ${paymentRows}
-          </tbody>
-        </table>
-      </div>
-
-      <div class="section">
-        ${documentRow(
-          "Reservation Total",
-          money(
-            reservation.total_amount
-          )
-        )}
-
-        ${documentRow(
-          "Balance Due",
-          money(
-            balanceOutstanding
-          ),
-          true
-        )}
+        ${documentRow("Reservation Total", money(reservation.total_amount))}
+        ${documentRow(currentBalance < -0.005 ? "Current Credit" : "Current Balance", money(Math.abs(currentBalance)), true)}
       </div>
     `;
 
-    openPrintWindow(
-      `${reservation.reservation_number} - Payment Receipt`,
-      html
-    );
+    openPrintWindow(`${receipt.receipt_number} - Payment Receipt`, html);
   }
 
   // =========================================================
@@ -2684,6 +3162,7 @@ ${body}
     [
       "provisional",
       "confirmed",
+      "checked_in",
     ].includes(
       reservation.status
     );
@@ -2748,14 +3227,10 @@ ${body}
             {canEdit && (
               <button
                 type="button"
-                onClick={() =>
-                  router.push(
-                    `/reservations/${reservation.id}/edit`
-                  )
-                }
+                onClick={openStayCorrection}
                 style={editButton}
               >
-                ✎ Edit Reservation
+                Change Room / Dates
               </button>
             )}
 
@@ -2792,6 +3267,18 @@ ${body}
                 Check Out
               </button>
             )}
+
+            {reservation.status === "checked_out" &&
+              ["owner", "manager"].includes(currentStaffRole) && (
+                <button
+                  type="button"
+                  onClick={reopenCheckout}
+                  disabled={updating}
+                  style={editButton}
+                >
+                  Reopen Checkout
+                </button>
+              )}
 
             {canNoShow && (
               <button
@@ -3466,6 +3953,26 @@ ${body}
                             payment.amount
                           )}
                         </strong>
+
+                        {payment.transaction_type !== "refund" && (
+                          <button
+                            type="button"
+                            onClick={() => void openReceiptPDF(payment)}
+                            style={receiptButton}
+                          >
+                            {receipts.some((receipt) => receipt.payment_id === payment.id) ? "Receipt" : "Issue Receipt"}
+                          </button>
+                        )}
+
+                        {["owner", "manager"].includes(currentStaffRole) && (
+                          <button
+                            type="button"
+                            onClick={() => void reversePayment(payment)}
+                            style={reverseButton}
+                          >
+                            Reverse
+                          </button>
+                        )}
                       </div>
                     ))
                   )}
@@ -3514,7 +4021,7 @@ ${body}
                       No invoice has been generated yet.
                     </div>
                   ) : (
-                    <div style={invoiceCard}>
+                    <div><div style={invoiceCard}>
                       <div>
                         <span style={smallLabel}>
                           INVOICE NUMBER
@@ -3547,7 +4054,7 @@ ${body}
                           )}
                         </strong>
                       </div>
-                    </div>
+                    </div>{["owner", "manager"].includes(currentStaffRole) && <button type="button" onClick={() => void voidInvoice()} disabled={generatingInvoice} style={reverseButton}>Void invoice and allow corrected reissue</button>}</div>
                   )}
                 </div>
               )}
@@ -3626,14 +4133,12 @@ ${body}
 
                     <button
                       type="button"
-                      onClick={() =>
-                        openReceiptPDF()
-                      }
-                      disabled={payments.length === 0}
+                      onClick={() => void openReceiptPDF()}
+                      disabled={!payments.some((payment) => payment.transaction_type !== "refund")}
                       style={{
                         ...documentActionCard,
                         opacity:
-                          payments.length === 0
+                          !payments.some((payment) => payment.transaction_type !== "refund")
                             ? 0.5
                             : 1,
                       }}
@@ -3742,6 +4247,65 @@ ${body}
           </div>
         </div>
       </main>
+
+      {showCorrectionModal && (
+        <div style={modalOverlay}>
+          <form onSubmit={saveStayCorrection} style={{ ...modalBox, maxWidth: 560 }}>
+            <div style={modalHeader}>
+              <div>
+                <h2 style={modalTitle}>Change Room or Stay Dates</h2>
+                <div style={modalSubtitle}>
+                  {reservation.reservation_number} · availability will be checked before saving
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowCorrectionModal(false)} style={closeButton}>×</button>
+            </div>
+
+            <div style={modalGrid}>
+              <Field label="Check-in">
+                <input type="date" value={correctionArrival} onChange={(event) => setCorrectionArrival(event.target.value)} style={inputStyle} />
+              </Field>
+              <Field label="Check-out">
+                <input type="date" min={correctionArrival ? addDays(correctionArrival, 1) : undefined} value={correctionDeparture} onChange={(event) => setCorrectionDeparture(event.target.value)} style={inputStyle} />
+              </Field>
+            </div>
+
+            <Field label="Physical Room">
+              <select value={correctionRoomId} onChange={(event) => setCorrectionRoomId(event.target.value)} style={inputStyle}>
+                <option value="">Select room</option>
+                {availableRooms
+                  .filter((item) => item.room_type_id === reservationRoom?.room_type_id)
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      Room {item.room_number} · {formatHousekeeping(item.housekeeping_status)}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+
+            <Field label="Reason for Change">
+              <textarea
+                value={correctionReason}
+                onChange={(event) => setCorrectionReason(event.target.value)}
+                placeholder="Example: Guest extended stay by one night"
+                rows={3}
+                style={{ ...inputStyle, resize: "vertical" }}
+              />
+            </Field>
+
+            <div style={correctionNotice}>
+              The room must be available for the entire stay. Accommodation totals and VAT are recalculated automatically using the agreed nightly rate.
+            </div>
+
+            <div style={modalActions}>
+              <button type="button" onClick={() => setShowCorrectionModal(false)} style={secondaryButton}>Cancel</button>
+              <button type="submit" disabled={savingCorrection} style={primaryButton}>
+                {savingCorrection ? "Checking and Saving..." : "Save Change"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* PAYMENT MODAL */}
 
@@ -5067,6 +5631,33 @@ const modalActions: CSSProperties = {
   justifyContent: "flex-end",
   gap: 7,
   marginTop: 4,
+};
+
+const correctionNotice: CSSProperties = {
+  padding: "9px 10px",
+  border: "1px solid #B9CAD7",
+  borderRadius: 7,
+  background: "#F1F5F8",
+  color: "#40586B",
+  fontSize: 9,
+  lineHeight: 1.45,
+};
+
+const reverseButton: CSSProperties = {
+  border: "1px solid #C5AFA6",
+  borderRadius: 6,
+  padding: "5px 8px",
+  background: "#FFFFFF",
+  color: "#8A4029",
+  fontSize: 8,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const receiptButton: CSSProperties = {
+  ...reverseButton,
+  borderColor: "#A9C7DD",
+  color: "#0D5FA8",
 };
 
 const closeButton: CSSProperties = {

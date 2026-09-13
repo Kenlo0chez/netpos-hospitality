@@ -439,10 +439,11 @@ export default function ConvertQuotationPage() {
 
     return Array.from(
       new Set(
-        (data ?? [])
+        ((data ?? []) as Array<{
+          room_id: string | null;
+        }>)
           .map(
-            (row: any) =>
-              row.room_id as string | null
+            (row) => row.room_id
           )
           .filter(
             (value): value is string =>
@@ -450,6 +451,42 @@ export default function ConvertQuotationPage() {
           )
       )
     );
+  }
+
+  async function findConvertedReservation() {
+    if (!quotation) return null;
+
+    const { data, error } = await supabase
+      .from("reservations")
+      .select("id,reservation_number")
+      .eq("quotation_id", quotation.id)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(
+        `Conversion check: ${error.message}`
+      );
+    }
+
+    return data;
+  }
+
+  async function openExistingConversion(
+    reservation: { id: string; reservation_number: string }
+  ) {
+    await supabase
+      .from("quotations")
+      .update({
+        status: "converted",
+        converted_reservation_id: reservation.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", quotation!.id);
+
+    setMessage(
+      `This quotation is already linked to reservation ${reservation.reservation_number}. Opening it now.`
+    );
+    router.replace(`/reservations/${reservation.id}`);
   }
 
   async function confirmConversion() {
@@ -482,6 +519,16 @@ export default function ConvertQuotationPage() {
       string | null = null;
 
     try {
+      // A database uniqueness rule is the final safeguard, while this
+      // early check gives staff a clear recovery path instead of an error.
+      const existingReservation =
+        await findConvertedReservation();
+
+      if (existingReservation) {
+        await openExistingConversion(existingReservation);
+        return;
+      }
+
       // ---------------------------------------------------
       // RECHECK THE ROOM IMMEDIATELY BEFORE SAVE
       // ---------------------------------------------------
@@ -588,6 +635,16 @@ export default function ConvertQuotationPage() {
         reservationError ||
         !reservationData
       ) {
+        if (reservationError?.code === "23505") {
+          const concurrentReservation =
+            await findConvertedReservation();
+
+          if (concurrentReservation) {
+            await openExistingConversion(concurrentReservation);
+            return;
+          }
+        }
+
         throw new Error(
           reservationError?.message ??
             "Could not create reservation."
@@ -662,6 +719,7 @@ export default function ConvertQuotationPage() {
       // ---------------------------------------------------
 
       const {
+        data: convertedQuote,
         error: quoteUpdateError,
       } = await supabase
         .from("quotations")
@@ -682,9 +740,11 @@ export default function ConvertQuotationPage() {
         .eq(
           "status",
           "accepted"
-        );
+        )
+        .select("id")
+        .maybeSingle();
 
-      if (quoteUpdateError) {
+      if (quoteUpdateError || !convertedQuote) {
         await supabase
           .from("reservation_rooms")
           .delete()
@@ -705,9 +765,30 @@ export default function ConvertQuotationPage() {
           null;
 
         throw new Error(
-          `Reservation was rolled back because the quotation could not be marked Converted: ${quoteUpdateError.message}`
+          quoteUpdateError
+            ? `Reservation was rolled back because the quotation could not be marked Converted: ${quoteUpdateError.message}`
+            : "This quotation was changed by another user. The incomplete reservation was safely rolled back; refresh and try again."
         );
       }
+
+      await supabase.from("audit_logs").insert({
+        property_id: quotation.property_id,
+        user_id: null,
+        action: "quotation_converted",
+        entity_type: "reservation",
+        entity_id: reservationData.id,
+        old_values: {
+          quotation_id: quotation.id,
+          quotation_status: "accepted",
+        },
+        new_values: {
+          reservation_number: reservationData.reservation_number,
+          status: "confirmed",
+          room_id: roomId,
+          total_amount: quotation.total_amount,
+        },
+        reason: `Converted from ${quotation.quotation_number}`,
+      });
 
       sessionStorage.removeItem(
         "netpos_quote_to_convert"
