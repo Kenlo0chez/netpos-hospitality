@@ -459,6 +459,23 @@ export default function GuestsPage() {
     setMessage("");
 
     try {
+      const duplicate = guests.find((guest) =>
+        guest.id !== selectedGuestId &&
+        ((normalizePhone(mobile) && normalizePhone(guest.phone ?? "") === normalizePhone(mobile)) ||
+          (normalizeText(email) && normalizeText(guest.email ?? "") === normalizeText(email)) ||
+          (normalizeText(idNumber) && normalizeText(guest.id_number ?? "") === normalizeText(idNumber)))
+      );
+      if (duplicate) {
+        if (isQuickCreate && returnTo) {
+          alert(`An existing guest profile matches these details: ${duplicate.first_name} ${duplicate.last_name}. Netpos will use that profile instead of creating a duplicate.`);
+          const separator = returnTo.includes("?") ? "&" : "?";
+          router.replace(`${returnTo}${separator}guestId=${encodeURIComponent(duplicate.id)}`);
+          return;
+        }
+        selectGuest(duplicate);
+        throw new Error(`Possible duplicate guest: ${duplicate.first_name} ${duplicate.last_name}. The existing profile has been opened instead.`);
+      }
+
       const payload = {
         first_name:
           firstName.trim(),
@@ -829,61 +846,6 @@ export default function GuestsPage() {
           BRAND HEADER
       =================================================== */}
 
-      <header style={brandHeader}>
-        <div style={brandIdentity}>
-          <div style={brandMark}>
-            N
-          </div>
-
-          <div>
-            <div style={brandName}>
-              NETPOS HOSPITALITY
-            </div>
-
-            <div style={brandTagline}>
-              Property Management System
-            </div>
-          </div>
-        </div>
-
-        <div style={brandActions}>
-          <button
-            type="button"
-            onClick={() =>
-              router.push(
-                "/front-desk"
-              )
-            }
-            style={brandSecondaryButton}
-          >
-            Front Desk
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              router.push(
-                "/reservations"
-              )
-            }
-            style={brandSecondaryButton}
-          >
-            Reservations
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              clearForm();
-              setMessage("");
-            }}
-            style={brandPrimaryButton}
-          >
-            + New Guest / Customer
-          </button>
-        </div>
-      </header>
-
       {/* ===================================================
           TITLE + NAV
       =================================================== */}
@@ -899,50 +861,7 @@ export default function GuestsPage() {
           </div>
         </div>
 
-        <div style={navigationBar}>
-          <button
-            type="button"
-            onClick={() =>
-              router.push(
-                "/front-desk"
-              )
-            }
-            style={navigationButton}
-          >
-            Front Desk
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              router.push(
-                "/reservations"
-              )
-            }
-            style={navigationButton}
-          >
-            Reservations
-          </button>
-
-          <button
-            type="button"
-            style={activeNavigationButton}
-          >
-            Guests
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              router.push(
-                "/housekeeping"
-              )
-            }
-            style={navigationButton}
-          >
-            Housekeeping
-          </button>
-        </div>
+        <button type="button" onClick={() => { clearForm(); setMessage(""); }} style={brandPrimaryButton}>+ New Guest / Customer</button>
       </section>
 
       {/* ===================================================
@@ -1779,12 +1698,6 @@ const brandTagline: CSSProperties = {
   fontSize: 9,
 };
 
-const brandActions: CSSProperties = {
-  display: "flex",
-  gap: 7,
-  alignItems: "center",
-};
-
 const brandSecondaryButton: CSSProperties = {
   border:
     "1px solid rgba(255,255,255,.55)",
@@ -1850,32 +1763,6 @@ const pageSubtitle: CSSProperties = {
   margin: "4px 0 0",
   color: MUTED,
   fontSize: 10,
-};
-
-const navigationBar: CSSProperties = {
-  display: "flex",
-  gap: 3,
-  padding: 3,
-  border: "1px solid #CBD6E2",
-  borderRadius: 8,
-  background: "#E9EEF5",
-};
-
-const navigationButton: CSSProperties = {
-  border: 0,
-  borderRadius: 6,
-  padding: "7px 11px",
-  background: "transparent",
-  color: "#596777",
-  fontSize: 9,
-  fontWeight: 800,
-  cursor: "pointer",
-};
-
-const activeNavigationButton: CSSProperties = {
-  ...navigationButton,
-  background: BLUE,
-  color: "#fff",
 };
 
 const successBox: CSSProperties = {
@@ -2337,3 +2224,14 @@ const loadingBox: CSSProperties = {
   fontSize: 10,
 };
 
+function normalizeText(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function normalizePhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("264")) return digits;
+  if (digits.startsWith("0")) return `264${digits.slice(1)}`;
+  return digits.length === 8 ? `264${digits}` : digits;
+}
