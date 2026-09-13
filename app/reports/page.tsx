@@ -9,6 +9,7 @@ import {
 
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
+import { selectInitialProperty } from "@/src/lib/propertyScope";
 
 // =========================================================
 // TYPES
@@ -127,6 +128,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [generatedAt, setGeneratedAt] = useState(new Date());
+  const [canViewAllProperties, setCanViewAllProperties] = useState(false);
 
   // =========================================================
   // LOAD
@@ -150,14 +152,26 @@ export default function ReportsPage() {
         throw new Error(error.message);
       }
 
-      const rows = (data as Property[]) ?? [];
-      setProperties(rows);
+      const { scoped, selected } = selectInitialProperty(
+        (data as Property[]) ?? []
+      );
+      const staff = JSON.parse(
+        sessionStorage.getItem("netpos_staff") ?? "null"
+      ) as { role?: string } | null;
+      const ownerView = staff?.role === "owner";
+      const initialProperty = ownerView ? "all" : selected;
 
-      const firstPropertyId = rows[0]?.id ?? "";
-      setPropertyId(firstPropertyId);
+      setProperties(scoped);
+      setCanViewAllProperties(ownerView);
+      setPropertyId(initialProperty);
 
-      if (firstPropertyId) {
-        await runReport(firstPropertyId, startDate, endDate);
+      if (initialProperty) {
+        await runReport(
+          initialProperty,
+          startDate,
+          endDate,
+          scoped.map((property) => property.id)
+        );
       }
     } catch (error) {
       setErrorMessage(
@@ -173,7 +187,8 @@ export default function ReportsPage() {
   async function runReport(
     selectedPropertyId = propertyId,
     selectedStartDate = startDate,
-    selectedEndDate = endDate
+    selectedEndDate = endDate,
+    selectedPropertyIds = properties.map((property) => property.id)
   ) {
     if (!selectedPropertyId || !selectedStartDate || !selectedEndDate) {
       return;
@@ -188,6 +203,11 @@ export default function ReportsPage() {
     setErrorMessage("");
 
     try {
+      const allProperties = selectedPropertyId === "all";
+      const reportPropertyIds = allProperties
+        ? selectedPropertyIds
+        : [selectedPropertyId];
+
       const [
         guestResult,
         reservationResult,
@@ -216,7 +236,7 @@ export default function ReportsPage() {
             total_amount,
             cancelled_at
           `)
-          .eq("property_id", selectedPropertyId),
+          .in("property_id", reportPropertyIds),
 
         supabase
           .from("rooms")
@@ -228,13 +248,13 @@ export default function ReportsPage() {
             room_type_id,
             operational_status
           `)
-          .eq("property_id", selectedPropertyId)
+          .in("property_id", reportPropertyIds)
           .order("room_number"),
 
         supabase
           .from("room_types")
           .select("id,name")
-          .eq("property_id", selectedPropertyId)
+          .in("property_id", reportPropertyIds)
           .order("name"),
 
         supabase
@@ -248,7 +268,7 @@ export default function ReportsPage() {
             amount,
             received_at
           `)
-          .eq("property_id", selectedPropertyId)
+          .in("property_id", reportPropertyIds)
           .order("received_at"),
 
         supabase
@@ -260,7 +280,7 @@ export default function ReportsPage() {
             status,
             total_amount
           `)
-          .eq("property_id", selectedPropertyId)
+          .in("property_id", reportPropertyIds)
           .neq("status", "void"),
       ]);
 
@@ -517,7 +537,14 @@ export default function ReportsPage() {
 
       rows.push({
         roomId: room.id,
-        roomNumber: room.room_number,
+        roomNumber:
+          propertyId === "all"
+            ? `${
+                properties.find(
+                  (property) => property.id === room.property_id
+                )?.name ?? "Guesthouse"
+              } · ${room.room_number}`
+            : room.room_number,
         roomType:
           roomTypesById.get(room.room_type_id)?.name ??
           "-",
@@ -541,6 +568,8 @@ export default function ReportsPage() {
     reservationRooms,
     reservationsById,
     roomTypesById,
+    properties,
+    propertyId,
     startDate,
     endDate,
     periodDays,
@@ -819,7 +848,9 @@ export default function ReportsPage() {
 
   function printReport() {
     const propertyName =
-      properties.find(
+      propertyId === "all"
+        ? "All Guesthouses"
+        : properties.find(
         (property) => property.id === propertyId
       )?.name ?? "Property";
 
@@ -1204,6 +1235,9 @@ export default function ReportsPage() {
               }
               style={headerSelect}
             >
+              {canViewAllProperties && (
+                <option value="all">All Guesthouses</option>
+              )}
               {properties.map((property) => (
                 <option
                   key={property.id}
@@ -1769,15 +1803,20 @@ function PieChart({
     "#66798D",
   ];
 
-  let cursor = 0;
-
   const segments = items.map((item, index) => {
     const percentage =
       total > 0 ? (Math.max(0, item.value) / total) * 100 : 0;
-
-    const start = cursor;
-    const end = cursor + percentage;
-    cursor = end;
+    const start = items
+      .slice(0, index)
+      .reduce(
+        (sum, prior) =>
+          sum +
+          (total > 0
+            ? (Math.max(0, prior.value) / total) * 100
+            : 0),
+        0
+      );
+    const end = start + percentage;
 
     return `${palette[index % palette.length]} ${start}% ${end}%`;
   });
