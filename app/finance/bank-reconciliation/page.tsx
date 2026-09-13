@@ -32,6 +32,7 @@ type StatementLine = {
   match_status: "unmatched" | "suggested" | "matched" | "ignored";
   matched_payment_id: string | null;
   matched_expense_id: string | null;
+  matched_payout_id: string | null;
 };
 type Payment = {
   id: string;
@@ -49,6 +50,14 @@ type Expense = {
   reference: string | null;
   description: string;
   total_amount: number;
+  bank_account_id: string | null;
+};
+type Payout = {
+  id: string;
+  payout_date: string;
+  payee_name: string;
+  reference: string;
+  amount: number;
   bank_account_id: string | null;
 };
 type ParsedLine = {
@@ -73,6 +82,7 @@ export default function BankReconciliationPage() {
   const [lines, setLines] = useState<StatementLine[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [payouts, setPayouts] = useState<Payout[]>([]);
   const [preview, setPreview] = useState<ParsedLine[]>([]);
   const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -118,14 +128,15 @@ export default function BankReconciliationPage() {
       setLines([]);
       setPayments([]);
       setExpenses([]);
+      setPayouts([]);
       setLoading(false);
       return;
     }
 
-    const [lineResult, paymentResult, expenseResult] = await Promise.all([
+    const [lineResult, paymentResult, expenseResult, payoutResult] = await Promise.all([
       supabase
         .from("bank_statement_lines")
-        .select("id,transaction_date,description,bank_reference,amount,balance,match_status,matched_payment_id,matched_expense_id")
+        .select("id,transaction_date,description,bank_reference,amount,balance,match_status,matched_payment_id,matched_expense_id,matched_payout_id")
         .eq("bank_account_id", nextAccount)
         .order("transaction_date", { ascending: false })
         .limit(500),
@@ -143,14 +154,23 @@ export default function BankReconciliationPage() {
         .neq("status", "reversed")
         .order("expense_date", { ascending: false })
         .limit(500),
+      supabase
+        .from("payouts")
+        .select("id,payout_date,payee_name,reference,amount,bank_account_id")
+        .eq("property_id", selectedProperty)
+        .eq("status", "posted")
+        .in("payment_method", ["eft", "card"])
+        .order("payout_date", { ascending: false })
+        .limit(500),
     ]);
 
-    const error = lineResult.error ?? paymentResult.error ?? expenseResult.error;
+    const error = lineResult.error ?? paymentResult.error ?? expenseResult.error ?? payoutResult.error;
     if (error) setErrorMessage(error.message);
     else {
       setLines((lineResult.data as StatementLine[]) ?? []);
       setPayments((paymentResult.data as Payment[]) ?? []);
       setExpenses((expenseResult.data as Expense[]) ?? []);
+      setPayouts((payoutResult.data as Payout[]) ?? []);
     }
     setLoading(false);
   }, []);
@@ -196,11 +216,14 @@ export default function BankReconciliationPage() {
     const expenseMovement = expenses
       .filter((expense) => expense.bank_account_id === accountId && expense.expense_date <= periodEnd)
       .reduce((sum, expense) => sum + Number(expense.total_amount), 0);
-    const systemBalance = Number(account?.opening_balance ?? 0) + paymentMovement - expenseMovement;
+    const payoutMovement = payouts
+      .filter((payout) => payout.bank_account_id === accountId && payout.payout_date <= periodEnd)
+      .reduce((sum, payout) => sum + Number(payout.amount), 0);
+    const systemBalance = Number(account?.opening_balance ?? 0) + paymentMovement - expenseMovement - payoutMovement;
     const closing = Number(statementClosingBalance) || 0;
     const unresolved = lines.filter((line) => line.transaction_date >= periodStart && line.transaction_date <= periodEnd && line.match_status !== "matched" && line.match_status !== "ignored").length;
     return { systemBalance, closing, difference: closing - systemBalance, unresolved };
-  }, [accountId, accounts, expenses, lines, payments, periodEnd, periodStart, statementClosingBalance]);
+  }, [accountId, accounts, expenses, lines, payments, payouts, periodEnd, periodStart, statementClosingBalance]);
 
   async function createAccount() {
     if (!propertyId || !bankName.trim() || !accountName.trim()) {
@@ -319,7 +342,17 @@ export default function BankReconciliationPage() {
         kind: "expense" as const,
         label: `${expense.supplier_name} · ${money.format(Number(expense.total_amount))}`,
       }));
-    return [...paymentCandidates, ...expenseCandidates];
+    const payoutCandidates = Number(line.amount) >= 0 ? [] : payouts
+      .filter((payout) => {
+        const days = Math.abs(new Date(`${payout.payout_date}T12:00:00`).getTime() - date) / 86400000;
+        return Math.abs(Number(payout.amount) - Math.abs(Number(line.amount))) < 0.01 && days <= 5;
+      })
+      .map((payout) => ({
+        id: payout.id,
+        kind: "payout" as const,
+        label: `Payout · ${payout.payee_name} · ${money.format(Number(payout.amount))}`,
+      }));
+    return [...paymentCandidates, ...expenseCandidates, ...payoutCandidates];
   }
 
   async function matchLine(line: StatementLine, selection: string) {
@@ -334,6 +367,7 @@ export default function BankReconciliationPage() {
         match_status: "matched",
         matched_payment_id: kind === "payment" ? id : null,
         matched_expense_id: kind === "expense" ? id : null,
+        matched_payout_id: kind === "payout" ? id : null,
         matched_at: new Date().toISOString(),
         matched_by: staff?.id ?? null,
       })
@@ -352,11 +386,16 @@ export default function BankReconciliationPage() {
       const result = await supabase.from("expenses").update({ bank_account_id: accountId }).eq("id", id);
       relatedError = result.error;
     }
+    if (!error && kind === "payout") {
+      const result = await supabase.from("payouts").update({ bank_account_id: accountId }).eq("id", id);
+      relatedError = result.error;
+    }
     if (relatedError) {
       await supabase.from("bank_statement_lines").update({
         match_status: "unmatched",
         matched_payment_id: null,
         matched_expense_id: null,
+        matched_payout_id: null,
         matched_at: null,
         matched_by: null,
       }).eq("id", line.id);
