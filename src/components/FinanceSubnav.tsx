@@ -9,6 +9,7 @@ const items = [
   { label: "2 · Accounts", href: "/billing/accounts?filter=outstanding" },
   { label: "3 · X Report / EOD", href: "/cash-up" },
   { label: "4 · Cashbook & Expenses", href: "/finance/cashbook" },
+  { label: "Payouts", href: "/finance/payouts" },
   { label: "5 · Bank Reconciliation", href: "/finance/bank-reconciliation" },
   { label: "Bank Statement", href: "/finance/bank-statement" },
   { label: "VAT Report", href: "/finance/vat-report" },
