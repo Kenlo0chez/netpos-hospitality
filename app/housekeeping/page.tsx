@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -8,6 +9,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
+import { selectInitialProperty } from "@/src/lib/propertyScope";
 
 type Property = {
   id: string;
@@ -31,44 +33,12 @@ export default function HousekeepingPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingRoomId, setUpdatingRoomId] = useState("");
+  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
+  const [batchUpdating, setBatchUpdating] = useState(false);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  useEffect(() => {
-    initialise();
-  }, []);
-
-  async function initialise() {
-    setLoading(true);
-
-    try {
-      const { data, error } = await supabase
-        .from("properties")
-        .select("id,name")
-        .order("name");
-
-      if (error) throw new Error(error.message);
-
-      const rows = (data as Property[]) ?? [];
-
-      setProperties(rows);
-
-      if (rows.length > 0) {
-        setPropertyId(rows[0].id);
-        await loadRooms(rows[0].id);
-      }
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Could not load housekeeping."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadRooms(selectedPropertyId: string) {
+  const loadRooms = useCallback(async (selectedPropertyId: string) => {
     if (!selectedPropertyId) {
       setRooms([]);
       return;
@@ -93,10 +63,47 @@ export default function HousekeepingPage() {
     }
 
     setRooms((data as Room[]) ?? []);
-  }
+  }, []);
+
+  const initialise = useCallback(async () => {
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("id,name")
+        .order("name");
+
+      if (error) throw new Error(error.message);
+
+      const { scoped, selected } = selectInitialProperty((data as Property[]) ?? []);
+
+      setProperties(scoped);
+
+      if (selected) {
+        setPropertyId(selected);
+        await loadRooms(selected);
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not load housekeeping."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [loadRooms]);
+
+  useEffect(() => {
+    // Data loading starts after the authenticated client session is available.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void initialise();
+  }, [initialise]);
 
   async function changeProperty(value: string) {
     setPropertyId(value);
+    setSelectedRoomIds([]);
     setMessage("");
     setErrorMessage("");
     await loadRooms(value);
@@ -113,6 +120,7 @@ export default function HousekeepingPage() {
     setErrorMessage("");
 
     try {
+      const previousStatus = hkStatus(room);
       const { error } = await supabase
         .from("rooms")
         .update({ housekeeping_status: status })
@@ -131,6 +139,7 @@ export default function HousekeepingPage() {
       setMessage(
         `Room ${room.room_number} marked ${status}.`
       );
+      await writeHousekeepingAudit([room], "housekeeping_status_changed", status, `Room marked ${status}`, previousStatus);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -148,12 +157,30 @@ export default function HousekeepingPage() {
         ? "out_of_service"
         : "active";
 
-    const confirmed = window.confirm(
-      newStatus === "out_of_service"
-        ? `Take Room ${room.room_number} out of service?`
-        : `Return Room ${room.room_number} to service?`
-    );
+    if (newStatus === "out_of_service") {
+      const { data: assignments, error: assignmentError } = await supabase
+        .from("reservation_rooms")
+        .select("reservation_id,reservations(status)")
+        .eq("room_id", room.id);
+      if (assignmentError) {
+        setErrorMessage(`Could not verify room occupancy: ${assignmentError.message}`);
+        return;
+      }
+      const occupied = ((assignments as unknown as Array<{ reservations: { status: string } | null }>) ?? [])
+        .some((assignment) => assignment.reservations?.status === "checked_in");
+      if (occupied) {
+        setErrorMessage(`Room ${room.room_number} has a checked-in guest. Move or check out the guest before taking the room out of service.`);
+        return;
+      }
+    }
 
+    const reason = window.prompt(
+      newStatus === "out_of_service"
+        ? `Why is Room ${room.room_number} being taken out of service?`
+        : `Why is Room ${room.room_number} being returned to service?`
+    );
+    if (!reason?.trim()) return;
+    const confirmed = window.confirm(newStatus === "out_of_service" ? `Take Room ${room.room_number} out of service?` : `Return Room ${room.room_number} to service?`);
     if (!confirmed) return;
 
     setUpdatingRoomId(room.id);
@@ -181,6 +208,7 @@ export default function HousekeepingPage() {
           ? `Room ${room.room_number} taken out of service.`
           : `Room ${room.room_number} returned to service.`
       );
+      await writeHousekeepingAudit([room], "room_service_status_changed", newStatus, reason.trim(), room.operational_status);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -190,6 +218,51 @@ export default function HousekeepingPage() {
     } finally {
       setUpdatingRoomId("");
     }
+  }
+
+  async function writeHousekeepingAudit(
+    changedRooms: Room[],
+    action: string,
+    newStatus: string,
+    reason: string,
+    sharedOldStatus?: string,
+  ) {
+    const records = changedRooms.map((room) => ({
+      property_id: room.property_id,
+      user_id: null,
+      action,
+      entity_type: "room",
+      entity_id: room.id,
+      old_values: { status: sharedOldStatus ?? hkStatus(room) },
+      new_values: { status: newStatus },
+      reason,
+    }));
+    const { error } = await supabase.from("audit_logs").insert(records);
+    if (error) console.error("Housekeeping audit:", error.message);
+  }
+
+  async function applyBatchStatus(status: "clean" | "dirty" | "cleaning") {
+    const selectedRooms = rooms.filter((room) => selectedRoomIds.includes(room.id) && room.operational_status === "active");
+    if (!selectedRooms.length || batchUpdating) return;
+    if (status === "clean" && !window.confirm(`Mark ${selectedRooms.length} selected room${selectedRooms.length === 1 ? "" : "s"} Clean?`)) return;
+
+    setBatchUpdating(true);
+    setMessage("");
+    setErrorMessage("");
+    const { error } = await supabase.from("rooms").update({ housekeeping_status: status }).in("id", selectedRooms.map((room) => room.id)).eq("property_id", propertyId).eq("operational_status", "active");
+    if (error) {
+      setErrorMessage(error.message);
+    } else {
+      setRooms((current) => current.map((room) => selectedRoomIds.includes(room.id) && room.operational_status === "active" ? { ...room, housekeeping_status: status } : room));
+      await writeHousekeepingAudit(selectedRooms, "housekeeping_batch_status_changed", status, `${selectedRooms.length} rooms marked ${status} in housekeeping batch`);
+      setMessage(`${selectedRooms.length} room${selectedRooms.length === 1 ? "" : "s"} marked ${status}.`);
+      setSelectedRoomIds([]);
+    }
+    setBatchUpdating(false);
+  }
+
+  function toggleRoomSelection(roomId: string) {
+    setSelectedRoomIds((current) => current.includes(roomId) ? current.filter((id) => id !== roomId) : [...current, roomId]);
   }
 
   function hkStatus(room: Room) {
@@ -270,6 +343,14 @@ export default function HousekeepingPage() {
       {message && <div style={successBox}>{message}</div>}
       {errorMessage && <div style={errorBox}>{errorMessage}</div>}
 
+      <section style={batchBar}>
+        <label style={selectAllLabel}><input type="checkbox" checked={rooms.some((room) => room.operational_status === "active") && selectedRoomIds.length === rooms.filter((room) => room.operational_status === "active").length} onChange={(event) => setSelectedRoomIds(event.target.checked ? rooms.filter((room) => room.operational_status === "active").map((room) => room.id) : [])} /> Select all active rooms</label>
+        <strong>{selectedRoomIds.length} selected</strong>
+        <button type="button" disabled={!selectedRoomIds.length || batchUpdating} onClick={() => void applyBatchStatus("dirty")} style={batchButton}>Mark Dirty</button>
+        <button type="button" disabled={!selectedRoomIds.length || batchUpdating} onClick={() => void applyBatchStatus("cleaning")} style={batchButton}>Start Cleaning</button>
+        <button type="button" disabled={!selectedRoomIds.length || batchUpdating} onClick={() => void applyBatchStatus("clean")} style={batchCleanButton}>Mark Clean</button>
+      </section>
+
       {rooms.length === 0 ? (
         <div style={emptyBox}>
           No rooms found for this property.
@@ -291,6 +372,7 @@ export default function HousekeepingPage() {
               >
                 <div style={roomHeader}>
                   <div>
+                    <label style={roomSelectLabel}><input type="checkbox" disabled={out} checked={selectedRoomIds.includes(room.id)} onChange={() => toggleRoomSelection(room.id)} /> Select</label>
                     <div style={roomLabel}>ROOM</div>
                     <div style={roomNumber}>
                       {room.room_number}
@@ -464,6 +546,11 @@ const summaryGrid: CSSProperties = {
   marginBottom: 8,
 };
 
+const batchBar: CSSProperties = { display: "flex", alignItems: "center", gap: 8, minHeight: 38, marginBottom: 8, padding: "5px 8px", border: "1px solid #C9D9E5", borderRadius: 8, background: "#FFFFFF", color: "#456176", fontSize: 9, overflowX: "auto" };
+const selectAllLabel: CSSProperties = { display: "flex", alignItems: "center", gap: 5, marginRight: "auto", whiteSpace: "nowrap", fontWeight: 800 };
+const batchButton: CSSProperties = { minHeight: 27, padding: "4px 9px", border: "1px solid #B9CBD8", borderRadius: 5, background: "#F7FAFC", color: "#36546B", fontSize: 8, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" };
+const batchCleanButton: CSSProperties = { ...batchButton, borderColor: "#168257", background: "#168257", color: "#FFFFFF" };
+
 const summaryCard: CSSProperties = {
   minHeight: 42,
   background: "#fff",
@@ -515,6 +602,8 @@ const roomLabel: CSSProperties = {
   fontWeight: 800,
   color: "#7A8794",
 };
+
+const roomSelectLabel: CSSProperties = { display: "flex", alignItems: "center", gap: 3, marginBottom: 4, color: "#6F7D8C", fontSize: 7, fontWeight: 800 };
 
 const roomNumber: CSSProperties = {
   fontSize: 19,
