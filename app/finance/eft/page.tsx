@@ -101,7 +101,7 @@ export default function EftAllocationPage() {
   }
 
   return <main style={page}>
-    <header style={header}><div><div style={eyebrow}>FINANCE · EFT CONTROL</div><h1 style={title}>Allocate EFT payments</h1><p style={muted}>Match money received in the bank to the correct Netpos invoice.</p></div><div style={actions}><Link href="/finance" style={secondary}>← Finance</Link><label style={label}>Property<select value={propertyId} onChange={(event) => { setPropertyId(event.target.value); void loadData(event.target.value); }} style={select}>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></label></div></header><FinanceSubnav />
+    <header style={header}><div><div style={eyebrow}>FINANCE · EFT CONTROL</div><h1 style={title}>Allocate EFT payments</h1><p style={muted}>Match money received in the bank to the correct Netpos invoice.</p></div><div style={actions}><label style={label}>Property<select value={propertyId} onChange={(event) => { setPropertyId(event.target.value); void loadData(event.target.value); }} style={select}>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></label></div></header><FinanceSubnav />
     {setupRequired && <div style={warning}><strong>Finance database setup required.</strong><span>Apply migration 002 before using EFT allocation. No existing financial data will be removed.</span></div>}
     {errorMessage && !setupRequired && <div style={errorBox}>{errorMessage}</div>}
     {message && <div style={successBox}>{message}</div>}
