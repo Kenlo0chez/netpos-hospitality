@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
+import { scopeProperties } from "@/src/lib/propertyAccess";
 
 type Property = {
   id: string;
@@ -125,7 +126,7 @@ export default function SetupPage() {
       return;
     }
 
-    const rows = (data as Property[]) ?? [];
+    const rows = scopeProperties((data as Property[]) ?? []);
     setProperties(rows);
 
     if (rows[0]) {
