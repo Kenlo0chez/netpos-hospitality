@@ -16,6 +16,7 @@ type Guest = {
   last_name: string;
   phone: string | null;
   email: string | null;
+  id_number: string | null;
   company_id: string | null;
 };
 
@@ -70,6 +71,54 @@ type NightPrice = {
   rate: number;
   planName: string;
 };
+
+type DuplicateGuest = Guest & {
+  matchLabel: "mobile number" | "email address" | "ID number";
+};
+
+function normalisePhone(value: string | null | undefined) {
+  return (value ?? "").replace(/\D/g, "");
+}
+
+function normaliseText(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function findDuplicateGuest(
+  guests: Guest[],
+  phone: string,
+  email: string,
+  idNumber: string
+): DuplicateGuest | null {
+  const normalisedPhone = normalisePhone(phone);
+  const normalisedEmail = normaliseText(email);
+  const normalisedId = normaliseText(idNumber);
+
+  for (const guest of guests) {
+    if (
+      normalisedId &&
+      normaliseText(guest.id_number) === normalisedId
+    ) {
+      return { ...guest, matchLabel: "ID number" };
+    }
+
+    if (
+      normalisedEmail &&
+      normaliseText(guest.email) === normalisedEmail
+    ) {
+      return { ...guest, matchLabel: "email address" };
+    }
+
+    if (
+      normalisedPhone &&
+      normalisePhone(guest.phone) === normalisedPhone
+    ) {
+      return { ...guest, matchLabel: "mobile number" };
+    }
+  }
+
+  return null;
+}
 
 export default function NewReservationPage() {
   const router = useRouter();
@@ -219,6 +268,7 @@ export default function NewReservationPage() {
         last_name,
         phone,
         email,
+        id_number,
         company_id
       `)
       .order("last_name");
@@ -718,6 +768,22 @@ export default function NewReservationPage() {
       return;
     }
 
+    const duplicateGuest = findDuplicateGuest(
+      guests,
+      newMobile,
+      newEmail,
+      newIdNumber
+    );
+
+    if (duplicateGuest) {
+      setGuestId(duplicateGuest.id);
+      setShowGuestModal(false);
+      alert(
+        `${duplicateGuest.first_name} ${duplicateGuest.last_name} already exists with the same ${duplicateGuest.matchLabel}. The existing guest has been selected.`
+      );
+      return;
+    }
+
     setSavingGuest(true);
 
     const { data, error } = await supabase
@@ -740,6 +806,7 @@ export default function NewReservationPage() {
         last_name,
         phone,
         email,
+        id_number,
         company_id
       `)
       .single();
