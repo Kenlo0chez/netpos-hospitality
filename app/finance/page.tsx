@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { supabase } from "@/src/lib/supabase";
+import { scopeProperties } from "@/src/lib/propertyAccess";
 
 type Tab = "cashbook" | "reconciliation" | "vat" | "payouts";
 type Property = { id: string; name: string; vat_rate: number };
@@ -60,17 +61,10 @@ export default function FinancePage() {
   useEffect(() => {
     async function initialise() {
       const savedProperty = sessionStorage.getItem("netpos_property_id") ?? "";
-      const savedStaff = sessionStorage.getItem("netpos_staff");
-      const staff = savedStaff
-        ? (JSON.parse(savedStaff) as { role?: string; property_id?: string | null })
-        : null;
       const { data, error: propertyError } = await supabase
         .from("properties").select("id,name,vat_rate").eq("is_active", true).order("name");
       if (propertyError) { setError(propertyError.message); setLoading(false); return; }
-      const allRows = (data as Property[]) ?? [];
-      const rows = staff?.role === "manager" && staff.property_id
-        ? allRows.filter((property) => property.id === staff.property_id)
-        : allRows;
+      const rows = scopeProperties((data as Property[]) ?? []);
       setProperties(rows);
       const initial = rows.some((item) => item.id === savedProperty) ? savedProperty : rows[0]?.id ?? "";
       setPropertyId(initial);
