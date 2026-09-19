@@ -71,6 +71,59 @@ type GuestSummary = Guest & {
   outstanding: number;
 };
 
+type DuplicateGuest = Guest & {
+  matchLabel: "mobile number" | "email address" | "ID number";
+};
+
+function normalisePhone(value: string | null | undefined) {
+  return (value ?? "").replace(/\D/g, "");
+}
+
+function normaliseText(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function findDuplicateGuest(
+  guests: Guest[],
+  phone: string,
+  email: string,
+  idNumber: string,
+  excludedGuestId = ""
+): DuplicateGuest | null {
+  const normalisedPhone = normalisePhone(phone);
+  const normalisedEmail = normaliseText(email);
+  const normalisedId = normaliseText(idNumber);
+
+  for (const guest of guests) {
+    if (guest.id === excludedGuestId) {
+      continue;
+    }
+
+    if (
+      normalisedId &&
+      normaliseText(guest.id_number) === normalisedId
+    ) {
+      return { ...guest, matchLabel: "ID number" };
+    }
+
+    if (
+      normalisedEmail &&
+      normaliseText(guest.email) === normalisedEmail
+    ) {
+      return { ...guest, matchLabel: "email address" };
+    }
+
+    if (
+      normalisedPhone &&
+      normalisePhone(guest.phone) === normalisedPhone
+    ) {
+      return { ...guest, matchLabel: "mobile number" };
+    }
+  }
+
+  return null;
+}
+
 // =========================================================
 // PAGE
 // =========================================================
@@ -452,6 +505,47 @@ export default function GuestsPage() {
         "First name, surname and mobile number are required."
       );
 
+      return;
+    }
+
+    const duplicateGuest =
+      findDuplicateGuest(
+        guests,
+        mobile,
+        email,
+        idNumber,
+        selectedGuestId
+      );
+
+    if (duplicateGuest) {
+      const duplicateName =
+        `${duplicateGuest.first_name} ${duplicateGuest.last_name}`;
+
+      if (
+        isQuickCreate &&
+        returnTo
+      ) {
+        const separator =
+          returnTo.includes("?")
+            ? "&"
+            : "?";
+
+        alert(
+          `${duplicateName} already exists with the same ${duplicateGuest.matchLabel}. The existing guest will be used.`
+        );
+
+        router.replace(
+          `${returnTo}${separator}guestId=${encodeURIComponent(
+            duplicateGuest.id
+          )}`
+        );
+        return;
+      }
+
+      selectGuest(duplicateGuest);
+      alert(
+        `${duplicateName} already exists with the same ${duplicateGuest.matchLabel}. The existing profile has been opened instead.`
+      );
       return;
     }
 
@@ -2336,4 +2430,3 @@ const loadingBox: CSSProperties = {
   color: MUTED,
   fontSize: 10,
 };
-
