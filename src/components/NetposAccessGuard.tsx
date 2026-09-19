@@ -82,6 +82,11 @@ const MENU_ITEMS: MenuItem[] = [
     roles: ["owner", "manager"],
   },
   {
+    label: "Finance",
+    href: "/finance",
+    roles: ["owner", "manager"],
+  },
+  {
     label: "Setup",
     href: "/setup",
     roles: ["owner", "manager"],
