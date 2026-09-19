@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
+import { openHtmlDocumentPreview } from "@/src/lib/printPreview";
 
 type Property = {
   id: string;
@@ -585,22 +586,11 @@ export default function QuotationsPage() {
       )
     );
 
-    const popup = window.open(
-      "",
-      "_blank",
-      "width=900,height=900"
-    );
-
-    if (!popup) {
-      setError("Please allow pop-ups to print the quotation.");
-      return;
-    }
-
     const guestName = guest
       ? `${guest.first_name} ${guest.last_name}`
       : "Guest";
 
-    popup.document.write(`
+    const html = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -813,9 +803,12 @@ export default function QuotationsPage() {
         </script>
       </body>
       </html>
-    `);
+    `;
 
-    popup.document.close();
+    openHtmlDocumentPreview(
+      `${quote.quotation_number} - Quotation`,
+      html
+    );
   }
 
   return (
@@ -1934,5 +1927,4 @@ const saveButton: CSSProperties = {
   fontWeight: 900,
   cursor: "pointer",
 };
-
 
