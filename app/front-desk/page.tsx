@@ -10,6 +10,7 @@ import {
 
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
+import { canViewAllProperties, scopeProperties } from "@/src/lib/propertyAccess";
 
 // =========================================================
 // TYPES
@@ -131,12 +132,12 @@ export default function FrontDeskPage() {
         throw new Error(error.message);
       }
 
-      const propertyRows = (data as Property[]) ?? [];
+      const propertyRows = scopeProperties((data as Property[]) ?? []);
 
       setProperties(propertyRows);
 
       const initialPropertyId =
-        propertyRows.length > 1
+        canViewAllProperties() && propertyRows.length > 1
           ? ALL_PROPERTIES_ID
           : propertyRows.length === 1
           ? propertyRows[0].id
