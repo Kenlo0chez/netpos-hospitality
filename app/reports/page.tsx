@@ -10,6 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
 import { scopeProperties } from "@/src/lib/propertyAccess";
+import { openHtmlDocumentPreview } from "@/src/lib/printPreview";
 
 // =========================================================
 // TYPES
@@ -1151,22 +1152,11 @@ export default function ReportsPage() {
 </html>
     `;
 
-    const printWindow = window.open(
-      "",
-      "_blank",
-      "width=1100,height=850"
+    openHtmlDocumentPreview(
+      `Management Report - ${startDate} to ${endDate}`,
+      html,
+      "landscape"
     );
-
-    if (!printWindow) {
-      alert(
-        "Please allow pop-ups so the report can be printed or saved as PDF."
-      );
-      return;
-    }
-
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
   }
 
   // =========================================================
