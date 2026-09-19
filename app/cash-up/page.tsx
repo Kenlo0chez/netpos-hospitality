@@ -10,6 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
 import { scopeProperties } from "@/src/lib/propertyAccess";
+import { openHtmlDocumentPreview } from "@/src/lib/printPreview";
 
 // =========================================================
 // TYPES
@@ -974,25 +975,11 @@ export default function XReportPage() {
       </html>
     `;
 
-    const printWindow =
-      window.open(
-        "",
-        "_blank",
-        "width=950,height=760"
-      );
-
-    if (!printWindow) {
-      alert(
-        "Please allow pop-ups so the X Report can be printed."
-      );
-      return;
-    }
-
-    printWindow.document.open();
-    printWindow.document.write(
-      html
+    openHtmlDocumentPreview(
+      `X Report - ${selectedReportDay.business_date}`,
+      html,
+      "landscape"
     );
-    printWindow.document.close();
   }
 
   // =========================================================
