@@ -27,6 +27,9 @@ create index if not exists idx_finance_entries_bank_status
 
 alter table finance_entries enable row level security;
 
+grant select, insert, update on table public.finance_entries to authenticated;
+revoke all on table public.finance_entries from anon;
+
 create policy "finance users can read permitted entries"
 on finance_entries for select to authenticated
 using (
