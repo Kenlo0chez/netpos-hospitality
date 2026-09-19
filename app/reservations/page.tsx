@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
+import { scopeProperties } from "@/src/lib/propertyAccess";
 
 type Property = {
   id: string;
@@ -94,10 +95,10 @@ export default function ReservationsPage() {
     setLoading(true);
 
     try {
+      const allowedPropertyIds = await loadProperties();
       await Promise.all([
-        loadProperties(),
-        loadRooms(),
-        loadReservations(),
+        loadRooms(allowedPropertyIds),
+        loadReservations(allowedPropertyIds),
       ]);
     } finally {
       setLoading(false);
@@ -112,19 +113,26 @@ export default function ReservationsPage() {
 
     if (error) {
       alert(`Properties: ${error.message}`);
-      return;
+      return [] as string[];
     }
 
-    const rows = (data as Property[]) ?? [];
+    const rows = scopeProperties((data as Property[]) ?? []);
 
     setProperties(rows);
 
     if (rows.length === 1) {
       setPropertyId(rows[0].id);
     }
+
+    return rows.map((property) => property.id);
   }
 
-  async function loadRooms() {
+  async function loadRooms(allowedPropertyIds: string[]) {
+    if (allowedPropertyIds.length === 0) {
+      setRooms([]);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("rooms")
       .select(`
@@ -138,6 +146,7 @@ export default function ReservationsPage() {
           name
         )
       `)
+      .in("property_id", allowedPropertyIds)
       .eq("operational_status", "active")
       .order("room_number");
 
@@ -149,7 +158,12 @@ export default function ReservationsPage() {
     setRooms((data as unknown as Room[]) ?? []);
   }
 
-  async function loadReservations() {
+  async function loadReservations(allowedPropertyIds: string[]) {
+    if (allowedPropertyIds.length === 0) {
+      setReservations([]);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("reservations")
       .select(`
@@ -185,6 +199,7 @@ export default function ReservationsPage() {
           )
         )
       `)
+      .in("property_id", allowedPropertyIds)
       .order("arrival_date", { ascending: true });
 
     if (error) {
@@ -2208,4 +2223,3 @@ const rowGrid: React.CSSProperties = {
   color: TEXT,
   cursor: "pointer",
 };
-
