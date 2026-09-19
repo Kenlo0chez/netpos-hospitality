@@ -9,6 +9,7 @@ import {
 
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
+import { scopeProperties } from "@/src/lib/propertyAccess";
 
 // =========================================================
 // TYPES
@@ -150,7 +151,7 @@ export default function ReportsPage() {
         throw new Error(error.message);
       }
 
-      const rows = (data as Property[]) ?? [];
+      const rows = scopeProperties((data as Property[]) ?? []);
       setProperties(rows);
 
       const firstPropertyId = rows[0]?.id ?? "";
