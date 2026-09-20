@@ -500,6 +500,17 @@ export default function UsersPermissionsPage() {
     }
 
     if (
+      editingUser &&
+      password.length > 0 &&
+      password.length < 6
+    ) {
+      alert(
+        "A replacement password must be at least 6 characters. Leave it blank to keep the current password."
+      );
+      return;
+    }
+
+    if (
       userRole !== "owner" &&
       !assignedPropertyId
     ) {
@@ -513,34 +524,51 @@ export default function UsersPermissionsPage() {
 
     try {
       if (editingUser) {
-        const {
-          error,
-        } = await supabase
-          .from("staff_users")
-          .update({
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+
+        if (sessionError) {
+          throw new Error(sessionError.message);
+        }
+
+        const accessToken = sessionData.session?.access_token;
+
+        if (!accessToken) {
+          throw new Error(
+            "Your login session has expired. Please log in again."
+          );
+        }
+
+        const response = await fetch("/api/staff/update", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            id: editingUser.id,
+            full_name: fullName.trim(),
+            email: email.trim(),
+            password,
+            role: userRole,
             property_id:
               userRole === "owner"
                 ? null
                 : assignedPropertyId,
-            full_name:
-              fullName.trim(),
-            email:
-              email.trim() || null,
-            role: userRole,
             is_active: isActive,
-            updated_at:
-              new Date().toISOString(),
-          })
-          .eq("id", editingUser.id);
+          }),
+        });
 
-        if (error) {
+        const result = await response.json();
+
+        if (!response.ok) {
           throw new Error(
-            error.message
+            result.error ?? "Could not update staff user."
           );
         }
 
         setMessage(
-          `${fullName.trim()} updated successfully.`
+          `${fullName.trim()} updated successfully.${password ? " Password replaced securely." : ""}`
         );
       } else {
         const {
@@ -1198,25 +1226,27 @@ export default function UsersPermissionsPage() {
               }}
             />
 
-            {!editingUser && (
-              <>
-                <label style={fieldLabel}>
-                  Password
-                </label>
+            <label style={fieldLabel}>
+              {editingUser
+                ? "Replace Password"
+                : "Password"}
+            </label>
 
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) =>
-                    setPassword(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Minimum 6 characters"
-                  style={inputStyle}
-                />
-              </>
-            )}
+            <input
+              type="password"
+              value={password}
+              onChange={(event) =>
+                setPassword(
+                  event.target.value
+                )
+              }
+              placeholder={
+                editingUser
+                  ? "Leave blank to keep current password"
+                  : "Minimum 6 characters"
+              }
+              style={inputStyle}
+            />
 
             <label style={fieldLabel}>
               Contact Email
