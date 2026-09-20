@@ -9,7 +9,10 @@ import {
 
 import { useRouter } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
-import { scopeProperties } from "@/src/lib/propertyAccess";
+import {
+  canViewAllProperties,
+  scopeProperties,
+} from "@/src/lib/propertyAccess";
 import { openHtmlDocumentPreview } from "@/src/lib/printPreview";
 
 // =========================================================
@@ -63,6 +66,7 @@ type Room = {
 
 type RoomType = {
   id: string;
+  property_id: string;
   name: string;
 };
 
@@ -86,8 +90,21 @@ type Invoice = {
 
 type RoomPerformanceRow = {
   roomId: string;
+  propertyId: string;
+  propertyName: string;
   roomNumber: string;
   roomType: string;
+  availableNights: number;
+  soldNights: number;
+  occupancy: number;
+  revenue: number;
+  adr: number;
+};
+
+type PropertyPerformanceRow = {
+  propertyId: string;
+  propertyName: string;
+  rooms: number;
   availableNights: number;
   soldNights: number;
   occupancy: number;
@@ -100,6 +117,8 @@ type PieItem = {
   value: number;
   amount?: number;
 };
+
+const ALL_PROPERTIES = "__all_properties__";
 
 // =========================================================
 // PAGE
@@ -159,11 +178,14 @@ export default function ReportsPage() {
       const rows = scopeProperties((data as Property[]) ?? []);
       setProperties(rows);
 
-      const firstPropertyId = rows[0]?.id ?? "";
-      setPropertyId(firstPropertyId);
+      const initialPropertyId =
+        canViewAllProperties() && rows.length > 1
+          ? ALL_PROPERTIES
+          : rows[0]?.id ?? "";
+      setPropertyId(initialPropertyId);
 
-      if (firstPropertyId) {
-        await runReport(firstPropertyId, startDate, endDate);
+      if (initialPropertyId) {
+        await runReport(initialPropertyId, startDate, endDate);
       }
     } catch (error) {
       setErrorMessage(
@@ -194,6 +216,66 @@ export default function ReportsPage() {
     setErrorMessage("");
 
     try {
+      const reservationQuery = supabase
+        .from("reservations")
+        .select(`
+          id,
+          property_id,
+          guest_id,
+          reservation_number,
+          status,
+          booking_source,
+          arrival_date,
+          departure_date,
+          adults,
+          children,
+          total_amount,
+          cancelled_at
+        `);
+
+      const roomQuery = supabase
+        .from("rooms")
+        .select(`
+          id,
+          property_id,
+          room_number,
+          room_name,
+          room_type_id,
+          operational_status
+        `)
+        .order("room_number");
+
+      const roomTypeQuery = supabase
+        .from("room_types")
+        .select("id,property_id,name")
+        .order("name");
+
+      const paymentQuery = supabase
+        .from("payments")
+        .select(`
+          id,
+          property_id,
+          reservation_id,
+          payment_method,
+          transaction_type,
+          amount,
+          received_at
+        `)
+        .order("received_at");
+
+      const invoiceQuery = supabase
+        .from("invoices")
+        .select(`
+          id,
+          property_id,
+          reservation_id,
+          status,
+          total_amount
+        `)
+        .neq("status", "void");
+
+      const isAllProperties = selectedPropertyId === ALL_PROPERTIES;
+
       const [
         guestResult,
         reservationResult,
@@ -206,68 +288,25 @@ export default function ReportsPage() {
           .from("guests")
           .select("id,first_name,last_name"),
 
-        supabase
-          .from("reservations")
-          .select(`
-            id,
-            property_id,
-            guest_id,
-            reservation_number,
-            status,
-            booking_source,
-            arrival_date,
-            departure_date,
-            adults,
-            children,
-            total_amount,
-            cancelled_at
-          `)
-          .eq("property_id", selectedPropertyId),
+        isAllProperties
+          ? reservationQuery
+          : reservationQuery.eq("property_id", selectedPropertyId),
 
-        supabase
-          .from("rooms")
-          .select(`
-            id,
-            property_id,
-            room_number,
-            room_name,
-            room_type_id,
-            operational_status
-          `)
-          .eq("property_id", selectedPropertyId)
-          .order("room_number"),
+        isAllProperties
+          ? roomQuery
+          : roomQuery.eq("property_id", selectedPropertyId),
 
-        supabase
-          .from("room_types")
-          .select("id,name")
-          .eq("property_id", selectedPropertyId)
-          .order("name"),
+        isAllProperties
+          ? roomTypeQuery
+          : roomTypeQuery.eq("property_id", selectedPropertyId),
 
-        supabase
-          .from("payments")
-          .select(`
-            id,
-            property_id,
-            reservation_id,
-            payment_method,
-            transaction_type,
-            amount,
-            received_at
-          `)
-          .eq("property_id", selectedPropertyId)
-          .order("received_at"),
+        isAllProperties
+          ? paymentQuery
+          : paymentQuery.eq("property_id", selectedPropertyId),
 
-        supabase
-          .from("invoices")
-          .select(`
-            id,
-            property_id,
-            reservation_id,
-            status,
-            total_amount
-          `)
-          .eq("property_id", selectedPropertyId)
-          .neq("status", "void"),
+        isAllProperties
+          ? invoiceQuery
+          : invoiceQuery.eq("property_id", selectedPropertyId),
       ]);
 
       if (guestResult.error) {
@@ -372,6 +411,16 @@ export default function ReportsPage() {
 
     return map;
   }, [roomTypes]);
+
+  const propertiesById = useMemo(() => {
+    const map = new Map<string, Property>();
+
+    for (const property of properties) {
+      map.set(property.id, property);
+    }
+
+    return map;
+  }, [properties]);
 
   const roomsById = useMemo(() => {
     const map = new Map<string, Room>();
@@ -523,6 +572,10 @@ export default function ReportsPage() {
 
       rows.push({
         roomId: room.id,
+        propertyId: room.property_id,
+        propertyName:
+          propertiesById.get(room.property_id)?.name ??
+          "Property",
         roomNumber: room.room_number,
         roomType:
           roomTypesById.get(room.room_type_id)?.name ??
@@ -535,22 +588,65 @@ export default function ReportsPage() {
       });
     }
 
-    return rows.sort((a, b) =>
-      a.roomNumber.localeCompare(
-        b.roomNumber,
-        undefined,
-        { numeric: true }
-      )
-    );
+    return rows.sort((a, b) => {
+      const propertyOrder = a.propertyName.localeCompare(
+        b.propertyName
+      );
+
+      return propertyOrder !== 0
+        ? propertyOrder
+        : a.roomNumber.localeCompare(
+            b.roomNumber,
+            undefined,
+            { numeric: true }
+          );
+    });
   }, [
     rooms,
     reservationRooms,
     reservationsById,
     roomTypesById,
+    propertiesById,
     startDate,
     endDate,
     periodDays,
   ]);
+
+  const propertyPerformance = useMemo(() => {
+    const grouped = new Map<string, PropertyPerformanceRow>();
+
+    for (const room of roomPerformance) {
+      const current = grouped.get(room.propertyId) ?? {
+        propertyId: room.propertyId,
+        propertyName: room.propertyName,
+        rooms: 0,
+        availableNights: 0,
+        soldNights: 0,
+        occupancy: 0,
+        revenue: 0,
+        adr: 0,
+      };
+
+      current.rooms += 1;
+      current.availableNights += room.availableNights;
+      current.soldNights += room.soldNights;
+      current.revenue += room.revenue;
+      current.occupancy =
+        current.availableNights > 0
+          ? (current.soldNights / current.availableNights) * 100
+          : 0;
+      current.adr =
+        current.soldNights > 0
+          ? current.revenue / current.soldNights
+          : 0;
+
+      grouped.set(room.propertyId, current);
+    }
+
+    return Array.from(grouped.values()).sort((a, b) =>
+      a.propertyName.localeCompare(b.propertyName)
+    );
+  }, [roomPerformance]);
 
   const roomNightsSold = roomPerformance.reduce(
     (total, row) => total + row.soldNights,
@@ -739,6 +835,12 @@ export default function ReportsPage() {
       reservation.departure_date <= addDays(endDate, 1)
   ).length;
 
+  const selectedPropertyName =
+    propertyId === ALL_PROPERTIES
+      ? "All Properties"
+      : properties.find((property) => property.id === propertyId)?.name ??
+        "Selected Property";
+
   function sendWhatsAppReport() {
     const phone = ownerWhatsApp.replace(/\D/g, "");
 
@@ -751,13 +853,9 @@ export default function ReportsPage() {
 
     localStorage.setItem("netpos_owner_whatsapp", phone);
 
-    const propertyName =
-      properties.find((property) => property.id === propertyId)?.name ??
-      "Selected Property";
-
     const report = [
       "*NETPOS HOSPITALITY — OWNER REPORT*",
-      `*${propertyName}*`,
+      `*${selectedPropertyName}*`,
       `${formatDate(startDate)} to ${formatDate(endDate)}`,
       `Generated: ${generatedAt.toLocaleString("en-NA")}`,
       "",
@@ -891,18 +989,34 @@ export default function ReportsPage() {
   // =========================================================
 
   function printReport() {
-    const propertyName =
-      properties.find(
-        (property) => property.id === propertyId
-      )?.name ?? "Property";
+    const propertyName = selectedPropertyName;
 
     const roomRows = roomPerformance
       .map(
         (row) => `
           <tr>
-            <td>${escapeHtml(row.roomNumber)}</td>
+            <td>${escapeHtml(
+              propertyId === ALL_PROPERTIES
+                ? `${row.propertyName} · ${row.roomNumber}`
+                : row.roomNumber
+            )}</td>
             <td>${escapeHtml(row.roomType)}</td>
             <td class="right">${row.availableNights}</td>
+            <td class="right">${row.soldNights}</td>
+            <td class="right">${row.occupancy.toFixed(1)}%</td>
+            <td class="right">${money(row.revenue)}</td>
+            <td class="right">${money(row.adr)}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    const propertyRows = propertyPerformance
+      .map(
+        (row) => `
+          <tr>
+            <td>${escapeHtml(row.propertyName)}</td>
+            <td class="right">${row.rooms}</td>
             <td class="right">${row.soldNights}</td>
             <td class="right">${row.occupancy.toFixed(1)}%</td>
             <td class="right">${money(row.revenue)}</td>
@@ -1175,6 +1289,27 @@ export default function ReportsPage() {
     </div>
   </div>
 
+  ${
+    propertyId === ALL_PROPERTIES
+      ? `<div class="section">
+    <h2>Property Performance</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th class="right">Rooms</th>
+          <th class="right">Sold Nights</th>
+          <th class="right">Occupancy</th>
+          <th class="right">Revenue</th>
+          <th class="right">ADR</th>
+        </tr>
+      </thead>
+      <tbody>${propertyRows}</tbody>
+    </table>
+  </div>`
+      : ""
+  }
+
   <div class="section">
     <h2>Room Performance</h2>
     <table>
@@ -1266,6 +1401,12 @@ export default function ReportsPage() {
               }
               style={headerSelect}
             >
+              {canViewAllProperties() && properties.length > 1 && (
+                <option value={ALL_PROPERTIES}>
+                  All Properties
+                </option>
+              )}
+
               {properties.map((property) => (
                 <option
                   key={property.id}
@@ -1578,6 +1719,38 @@ export default function ReportsPage() {
             </section>
           </div>
 
+          {propertyId === ALL_PROPERTIES && (
+            <section style={panel}>
+                <PanelHeader
+                  title="Property Performance"
+                  subtitle="Consolidated comparison across all guest houses"
+                />
+
+                <div style={propertyPerformanceHeader}>
+                  <div>Property</div>
+                  <div>Rooms</div>
+                  <div>Sold</div>
+                  <div>Occupancy</div>
+                  <div>Revenue</div>
+                  <div>ADR</div>
+                </div>
+
+                {propertyPerformance.map((row) => (
+                  <div
+                    key={row.propertyId}
+                    style={propertyPerformanceRow}
+                  >
+                    <strong>{row.propertyName}</strong>
+                    <span>{row.rooms}</span>
+                    <span>{row.soldNights}</span>
+                    <strong>{row.occupancy.toFixed(1)}%</strong>
+                    <strong>{money(row.revenue)}</strong>
+                    <span>{money(row.adr)}</span>
+                  </div>
+                ))}
+            </section>
+          )}
+
           <section style={panel}>
             <PanelHeader
               title="Room Performance"
@@ -1610,7 +1783,9 @@ export default function ReportsPage() {
                     style={roomTableRow}
                   >
                     <strong style={roomNumberText}>
-                      {row.roomNumber}
+                      {propertyId === ALL_PROPERTIES
+                        ? `${row.propertyName} · ${row.roomNumber}`
+                        : row.roomNumber}
                     </strong>
 
                     <span>{row.roomType}</span>
@@ -2425,6 +2600,28 @@ const roomTableHeader: CSSProperties = {
   fontSize: 7,
   fontWeight: 900,
   textTransform: "uppercase",
+};
+
+const propertyPerformanceHeader: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1.6fr .55fr .55fr .8fr 1fr .8fr",
+  gap: 8,
+  padding: "6px 9px",
+  background: "#EFF4F9",
+  color: "#56697D",
+  fontSize: 7,
+  fontWeight: 900,
+  textTransform: "uppercase",
+};
+
+const propertyPerformanceRow: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1.6fr .55fr .55fr .8fr 1fr .8fr",
+  gap: 8,
+  padding: "7px 9px",
+  borderBottom: "1px solid #E9EEF3",
+  fontSize: 8,
+  alignItems: "center",
 };
 
 const roomTableRow: CSSProperties = {
