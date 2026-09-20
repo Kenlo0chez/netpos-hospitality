@@ -1123,6 +1123,89 @@ export default function ReservationDetailsPage() {
   }
 
   // =========================================================
+  // CONFIRM PROVISIONAL RESERVATION
+  // Re-checks the physical room before changing status.
+  // =========================================================
+
+  async function confirmReservation() {
+    if (
+      !reservation ||
+      reservation.status !== "provisional" ||
+      !reservationRoom?.room_id
+    ) {
+      return;
+    }
+
+    setUpdating(true);
+    setMessage("");
+
+    try {
+      const { data: conflicts, error: conflictError } =
+        await supabase
+          .from("reservation_rooms")
+          .select(`
+            id,
+            reservation_id,
+            reservations!inner (
+              status,
+              reservation_number
+            )
+          `)
+          .eq("room_id", reservationRoom.room_id)
+          .neq("reservation_id", reservation.id)
+          .lt("arrival_date", reservation.departure_date)
+          .gt("departure_date", reservation.arrival_date)
+          .in("reservations.status", [
+            "confirmed",
+            "checked_in",
+          ]);
+
+      if (conflictError) {
+        throw new Error(conflictError.message);
+      }
+
+      if ((conflicts ?? []).length > 0) {
+        alert(
+          `Room ${room?.room_number ?? "selected"} is no longer available for these dates. Keep this reservation provisional and assign another room before confirming.`
+        );
+        return;
+      }
+
+      const approved = window.confirm(
+        `Confirm reservation ${reservation.reservation_number} for ${guestName()}?\n\nRoom ${room?.room_number ?? "selected"} will be reserved from ${formatFriendlyDate(reservation.arrival_date)} to ${formatFriendlyDate(reservation.departure_date)}.`
+      );
+
+      if (!approved) {
+        return;
+      }
+
+      const { error } = await supabase
+        .from("reservations")
+        .update({ status: "confirmed" })
+        .eq("id", reservation.id)
+        .eq("status", "provisional");
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      await loadReservation(reservation.id);
+      setMessage(
+        `${reservation.reservation_number} confirmed successfully. The physical room is now secured.`
+      );
+      router.refresh();
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Could not confirm reservation."
+      );
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  // =========================================================
   // CHECK IN
   // =========================================================
 
@@ -2511,6 +2594,10 @@ export default function ReservationDetailsPage() {
       reservation.status
     );
 
+  const canConfirm =
+    reservation.status ===
+    "provisional";
+
   const canNoShow =
     reservation.status ===
     "confirmed";
@@ -2583,6 +2670,17 @@ export default function ReservationDetailsPage() {
             >
               Confirmation PDF
             </button>
+
+            {canConfirm && (
+              <button
+                type="button"
+                onClick={confirmReservation}
+                disabled={updating}
+                style={primaryButton}
+              >
+                Confirm Reservation
+              </button>
+            )}
 
             {reservation.status ===
               "confirmed" && (
