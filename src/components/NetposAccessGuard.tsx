@@ -390,54 +390,15 @@ export default function NetposAccessGuard({
                         {financeMenuOpen && (
                           <div role="menu" style={financeDropdown}>
                             <Link
-                              href="/finance#cashbook"
+                              href="/finance"
                               role="menuitem"
                               onClick={() => setFinanceMenuOpen(false)}
                               style={financeShortcutLink}
                             >
-                              <span style={financeShortcutIcon}>CB</span>
+                              <span style={financeShortcutIcon}>FI</span>
                               <span style={financeShortcutCopy}>
-                                <strong>Cashbook</strong>
-                                <span>Batch income and expense posting</span>
-                              </span>
-                            </Link>
-
-                            <Link
-                              href="/finance#reconciliation"
-                              role="menuitem"
-                              onClick={() => setFinanceMenuOpen(false)}
-                              style={financeShortcutLink}
-                            >
-                              <span style={financeShortcutIcon}>BR</span>
-                              <span style={financeShortcutCopy}>
-                                <strong>Bank Reconciliation</strong>
-                                <span>Match entries to bank activity</span>
-                              </span>
-                            </Link>
-
-                            <Link
-                              href="/finance#vat"
-                              role="menuitem"
-                              onClick={() => setFinanceMenuOpen(false)}
-                              style={financeShortcutLink}
-                            >
-                              <span style={financeShortcutIcon}>VAT</span>
-                              <span style={financeShortcutCopy}>
-                                <strong>VAT Report</strong>
-                                <span>Review VAT collected and paid</span>
-                              </span>
-                            </Link>
-
-                            <Link
-                              href="/finance#payouts"
-                              role="menuitem"
-                              onClick={() => setFinanceMenuOpen(false)}
-                              style={financeShortcutLink}
-                            >
-                              <span style={financeShortcutIcon}>PO</span>
-                              <span style={financeShortcutCopy}>
-                                <strong>Payouts</strong>
-                                <span>Review processed cash payouts</span>
+                                <strong>Finance Overview</strong>
+                                <span>Cashbook, bank, VAT and payouts</span>
                               </span>
                             </Link>
 
