@@ -2801,25 +2801,26 @@ const selectedBadge: React.CSSProperties = {
 
 const reviewGrid: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 10,
+  gridTemplateColumns: "repeat(4,minmax(0,1fr))",
+  gap: 7,
 };
 
 const reviewItem: React.CSSProperties = {
   borderWidth: 1,
   borderStyle: "solid",
   borderColor: "#e3e3e3",
-  borderRadius: 8,
-  padding: 11,
+  borderRadius: 7,
+  padding: "7px 9px",
+  minHeight: 48,
 };
 
 const financialBox: React.CSSProperties = {
-  marginTop: 18,
+  marginTop: 9,
   borderWidth: 1,
   borderStyle: "solid",
   borderColor: "#ddd",
-  borderRadius: 9,
-  padding: 13,
+  borderRadius: 8,
+  padding: "7px 11px",
   background: "#fafafa",
 };
 
@@ -2827,7 +2828,7 @@ const moneyRow: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  padding: "7px 0",
+  padding: "4px 0",
   fontSize: 10,
   borderBottomWidth: 1,
   borderBottomStyle: "solid",
@@ -2838,7 +2839,7 @@ const moneyEditRow: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  padding: "7px 0",
+  padding: "4px 0",
   fontSize: 10,
   borderBottomWidth: 1,
   borderBottomStyle: "solid",
@@ -2852,12 +2853,12 @@ const moneyInputWrap: React.CSSProperties = {
 };
 
 const moneyInput: React.CSSProperties = {
-  width: 100,
+  width: 88,
   borderWidth: 1,
   borderStyle: "solid",
   borderColor: "#ccc",
   borderRadius: 6,
-  padding: "6px 7px",
+  padding: "4px 7px",
   textAlign: "right",
 };
 
@@ -2865,12 +2866,12 @@ const grandTotalRow: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  paddingTop: 12,
-  fontSize: 16,
+  paddingTop: 7,
+  fontSize: 14,
 };
 
 const moreButton: React.CSSProperties = {
-  marginTop: 13,
+  marginTop: 7,
   borderWidth: 0,
   background: "transparent",
   color: "#173f73",
@@ -2884,7 +2885,7 @@ const finalButtons: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  marginTop: 22,
+  marginTop: 9,
 };
 
 const confirmButton: React.CSSProperties = {
@@ -2892,7 +2893,7 @@ const confirmButton: React.CSSProperties = {
   background: "#0D5598",
   color: "white",
   borderRadius: 8,
-  padding: "10px 16px",
+  padding: "9px 16px",
   fontSize: 10,
   fontWeight: 800,
   cursor: "pointer",

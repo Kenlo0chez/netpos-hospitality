@@ -3092,6 +3092,31 @@ export default function ReservationDetailsPage() {
                 />
               </div>
 
+              {![
+                "cancelled",
+                "no_show",
+              ].includes(
+                reservation.status
+              ) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentAmount(
+                      balanceOutstanding > 0
+                        ? balanceOutstanding.toFixed(
+                            2
+                          )
+                        : ""
+                    );
+
+                    setShowPaymentModal(true);
+                  }}
+                  style={folioPaymentButton}
+                >
+                  + Record Payment
+                </button>
+              )}
+
               <div style={folioTabs}>
                 <FolioTab
                   label="Folio"
@@ -3580,30 +3605,6 @@ export default function ReservationDetailsPage() {
                 </div>
               )}
 
-              {![
-                "cancelled",
-                "no_show",
-              ].includes(
-                reservation.status
-              ) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPaymentAmount(
-                      balanceOutstanding > 0
-                        ? balanceOutstanding.toFixed(
-                            2
-                          )
-                        : ""
-                    );
-
-                    setShowPaymentModal(true);
-                  }}
-                  style={folioPaymentButton}
-                >
-                  + Record Payment
-                </button>
-              )}
             </section>
 
             <section style={cardStyle}>
@@ -5349,7 +5350,7 @@ const documentIcon: CSSProperties = {
 
 const folioPaymentButton: CSSProperties = {
   width: "calc(100% - 20px)",
-  margin: "0 10px 10px",
+  margin: "0 10px 9px",
   border: 0,
   borderRadius: 8,
   padding: "9px 10px",
