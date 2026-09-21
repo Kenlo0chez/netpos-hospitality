@@ -44,6 +44,26 @@ export default function FinancePage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    function openRequestedSection() {
+      const requested = window.location.hash.replace("#", "") as Tab;
+
+      if (tabs.some((tab) => tab.id === requested)) {
+        setActiveTab(requested);
+      }
+    }
+
+    openRequestedSection();
+    window.addEventListener("hashchange", openRequestedSection);
+
+    return () => window.removeEventListener("hashchange", openRequestedSection);
+  }, []);
+
+  function selectFinanceSection(section: Tab) {
+    setActiveTab(section);
+    window.history.replaceState(null, "", `#${section}`);
+  }
+
   const loadEntries = useCallback(async (selectedProperty: string) => {
     if (!selectedProperty) return;
     setLoading(true); setError("");
@@ -167,7 +187,7 @@ export default function FinancePage() {
       <Metric label="Expenses & Payouts" value={money(totals.expenses)} tone="red" />
       <Metric label="Net Cashbook" value={money(totals.balance)} tone={totals.balance >= 0 ? "blue" : "red"} />
       <Metric label="VAT Payable" value={money(totals.vatDue)} tone="silver" /></div>
-    <nav style={tabBar} aria-label="Finance sections">{tabs.map((tab) => <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+    <nav style={tabBar} aria-label="Finance sections">{tabs.map((tab) => <button key={tab.id} onClick={() => selectFinanceSection(tab.id)}
       style={{ ...tabButton, ...(activeTab === tab.id ? activeTabButton : {}) }}><strong>{tab.label}</strong><span>{tab.hint}</span></button>)}</nav>
     {error && <div style={errorBox}>{error}</div>}{message && <div style={successBox}>{message}</div>}
 

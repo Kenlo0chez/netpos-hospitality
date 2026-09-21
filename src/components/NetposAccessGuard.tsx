@@ -361,19 +361,55 @@ export default function NetposAccessGuard({
                         {financeMenuOpen && (
                           <div role="menu" style={financeDropdown}>
                             <Link
-                              href="/finance"
+                              href="/finance#cashbook"
                               role="menuitem"
                               onClick={() => setFinanceMenuOpen(false)}
-                              style={{
-                                ...financeDropdownLink,
-                                ...(pathname === "/finance" ||
-                                pathname.startsWith("/finance/")
-                                  ? financeDropdownLinkActive
-                                  : {}),
-                              }}
+                              style={financeShortcutLink}
                             >
-                              <strong>Finance Overview</strong>
-                              <span>Cashbook, VAT and reconciliation</span>
+                              <span style={financeShortcutIcon}>CB</span>
+                              <span style={financeShortcutCopy}>
+                                <strong>Cashbook</strong>
+                                <span>Batch income and expense posting</span>
+                              </span>
+                            </Link>
+
+                            <Link
+                              href="/finance#reconciliation"
+                              role="menuitem"
+                              onClick={() => setFinanceMenuOpen(false)}
+                              style={financeShortcutLink}
+                            >
+                              <span style={financeShortcutIcon}>BR</span>
+                              <span style={financeShortcutCopy}>
+                                <strong>Bank Reconciliation</strong>
+                                <span>Match entries to bank activity</span>
+                              </span>
+                            </Link>
+
+                            <Link
+                              href="/finance#vat"
+                              role="menuitem"
+                              onClick={() => setFinanceMenuOpen(false)}
+                              style={financeShortcutLink}
+                            >
+                              <span style={financeShortcutIcon}>VAT</span>
+                              <span style={financeShortcutCopy}>
+                                <strong>VAT Report</strong>
+                                <span>Review VAT collected and paid</span>
+                              </span>
+                            </Link>
+
+                            <Link
+                              href="/finance#payouts"
+                              role="menuitem"
+                              onClick={() => setFinanceMenuOpen(false)}
+                              style={financeShortcutLink}
+                            >
+                              <span style={financeShortcutIcon}>PO</span>
+                              <span style={financeShortcutCopy}>
+                                <strong>Payouts</strong>
+                                <span>Review processed cash payouts</span>
+                              </span>
                             </Link>
 
                             <Link
@@ -381,15 +417,18 @@ export default function NetposAccessGuard({
                               role="menuitem"
                               onClick={() => setFinanceMenuOpen(false)}
                               style={{
-                                ...financeDropdownLink,
+                                ...financeShortcutLink,
                                 ...(pathname === "/reports" ||
                                 pathname.startsWith("/reports/")
                                   ? financeDropdownLinkActive
                                   : {}),
                               }}
                             >
-                              <strong>Reports</strong>
-                              <span>Management and operational reports</span>
+                              <span style={financeShortcutIcon}>RP</span>
+                              <span style={financeShortcutCopy}>
+                                <strong>Management Reports</strong>
+                                <span>Operational and performance reporting</span>
+                              </span>
                             </Link>
                           </div>
                         )}
@@ -764,8 +803,8 @@ const financeDropdown: CSSProperties = {
   top: "calc(100% + 7px)",
   left: 0,
   zIndex: 1005,
-  width: 270,
-  padding: 7,
+  width: 320,
+  padding: 8,
   display: "flex",
   flexDirection: "column",
   gap: 4,
@@ -789,6 +828,42 @@ const financeDropdownLink: CSSProperties = {
 const financeDropdownLinkActive: CSSProperties = {
   background: "#EAF4FF",
   color: "#0D4F91",
+};
+
+const financeShortcutLink: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 11,
+  minHeight: 54,
+  padding: "8px 10px",
+  border: "1px solid #E1ECF4",
+  borderRadius: 8,
+  background: "#FFFFFF",
+  color: "#123F69",
+  textDecoration: "none",
+  boxSizing: "border-box",
+};
+
+const financeShortcutIcon: CSSProperties = {
+  width: 36,
+  height: 36,
+  flex: "0 0 36px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 8,
+  background: "#EAF4FF",
+  color: "#0D5FA8",
+  fontSize: 10,
+  fontWeight: 900,
+};
+
+const financeShortcutCopy: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 3,
+  fontSize: 12,
+  lineHeight: 1.2,
 };
 
 const eodMenuLink: CSSProperties = {
