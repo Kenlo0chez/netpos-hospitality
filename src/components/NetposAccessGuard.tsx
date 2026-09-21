@@ -87,11 +87,6 @@ const MENU_ITEMS: MenuItem[] = [
     roles: ["owner", "manager"],
   },
   {
-    label: "Users",
-    href: "/users",
-    roles: ["owner", "manager"],
-  },
-  {
     label: "X Report / EOD",
     href: "/cash-up",
     roles: ["owner", "manager", "reception"],
@@ -110,6 +105,7 @@ export default function NetposAccessGuard({
   const [staff, setStaff] = useState<StaffSession | null>(null);
   const [accessError, setAccessError] = useState("");
   const [financeMenuOpen, setFinanceMenuOpen] = useState(false);
+  const [setupMenuOpen, setSetupMenuOpen] = useState(false);
 
   const isPublic = useMemo(
     () =>
@@ -321,14 +317,19 @@ export default function NetposAccessGuard({
                   item.roles.includes(staff.role)
                 )
                 .map((item) => {
-                  const active = item.href === "/finance"
-                    ? pathname === "/finance" ||
-                      pathname.startsWith("/finance/") ||
-                      pathname === "/reports" ||
-                      pathname.startsWith("/reports/")
-                    :
-                    pathname === item.href ||
-                    pathname.startsWith(`${item.href}/`);
+                  const active =
+                    item.href === "/finance"
+                      ? pathname === "/finance" ||
+                        pathname.startsWith("/finance/") ||
+                        pathname === "/reports" ||
+                        pathname.startsWith("/reports/")
+                      : item.href === "/setup"
+                      ? pathname === "/setup" ||
+                        pathname.startsWith("/setup/") ||
+                        pathname === "/users" ||
+                        pathname.startsWith("/users/")
+                      : pathname === item.href ||
+                        pathname.startsWith(`${item.href}/`);
 
                   const isEod =
                     item.href === "/cash-up";
@@ -389,6 +390,69 @@ export default function NetposAccessGuard({
                             >
                               <strong>Reports</strong>
                               <span>Management and operational reports</span>
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  if (item.href === "/setup") {
+                    return (
+                      <div
+                        key={item.href}
+                        style={financeMenu}
+                        onMouseEnter={() => setSetupMenuOpen(true)}
+                        onMouseLeave={() => setSetupMenuOpen(false)}
+                      >
+                        <button
+                          type="button"
+                          aria-haspopup="menu"
+                          aria-expanded={setupMenuOpen}
+                          onClick={() =>
+                            setSetupMenuOpen((open) => !open)
+                          }
+                          style={{
+                            ...menuLink,
+                            ...financeMenuButton,
+                            ...(active ? activeMenuLink : {}),
+                          }}
+                        >
+                          Setup <span aria-hidden="true">▾</span>
+                        </button>
+
+                        {setupMenuOpen && (
+                          <div role="menu" style={financeDropdown}>
+                            <Link
+                              href="/setup"
+                              role="menuitem"
+                              onClick={() => setSetupMenuOpen(false)}
+                              style={{
+                                ...financeDropdownLink,
+                                ...(pathname === "/setup" ||
+                                pathname.startsWith("/setup/")
+                                  ? financeDropdownLinkActive
+                                  : {}),
+                              }}
+                            >
+                              <strong>Setup Overview</strong>
+                              <span>Properties, rooms and system settings</span>
+                            </Link>
+
+                            <Link
+                              href="/users"
+                              role="menuitem"
+                              onClick={() => setSetupMenuOpen(false)}
+                              style={{
+                                ...financeDropdownLink,
+                                ...(pathname === "/users" ||
+                                pathname.startsWith("/users/")
+                                  ? financeDropdownLinkActive
+                                  : {}),
+                              }}
+                            >
+                              <strong>Users</strong>
+                              <span>Staff accounts and property access</span>
                             </Link>
                           </div>
                         )}
