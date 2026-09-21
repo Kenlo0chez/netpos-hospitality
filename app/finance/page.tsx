@@ -50,6 +50,7 @@ export default function FinancePage() {
   const [batchNumber] = useState(() => `CB-${today().replaceAll("-", "")}-${String(Date.now()).slice(-4)}`);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -151,7 +152,7 @@ export default function FinancePage() {
   }
   function updateRow(id: string, field: keyof BatchRow, value: string) {
     setBatchRows((rows) => rows.map((row) => row.id === id ? { ...row, [field]: value } : row));
-    setMessage(""); setError("");
+    setDraftSaved(false); setMessage(""); setError("");
   }
   function removeRow(id: string) {
     setBatchRows((rows) => rows.length === 1 ? createRows() : rows.filter((row) => row.id !== id));
@@ -159,12 +160,13 @@ export default function FinancePage() {
   function saveBatchDraft() {
     if (!propertyId) { setError("Select a property before saving the batch."); return; }
     sessionStorage.setItem(`netpos_finance_batch_${propertyId}`, JSON.stringify(batchRows));
+    setDraftSaved(true);
     setError(""); setMessage("Batch saved as a draft on this workstation. It has not been posted yet.");
   }
   function clearBatch() {
     if (!window.confirm("Clear all unprocessed rows in this batch?")) return;
     sessionStorage.removeItem(`netpos_finance_batch_${propertyId}`);
-    setBatchRows(createRows()); setError(""); setMessage("Batch cleared.");
+    setBatchRows(createRows()); setDraftSaved(false); setError(""); setMessage("Batch cleared.");
   }
   async function processBatch() {
     const activeRows = batchRows.filter((row) => row.description.trim() || row.reference.trim() || Number(row.amount) > 0);
@@ -184,6 +186,7 @@ export default function FinancePage() {
     if (insertError) setError(insertError.message);
     else {
       sessionStorage.removeItem(`netpos_finance_batch_${propertyId}`); setBatchRows(createRows());
+      setDraftSaved(false);
       setMessage(`${activeRows.length} transaction${activeRows.length === 1 ? "" : "s"} processed successfully.`);
       await loadEntries(propertyId);
     }
@@ -272,6 +275,12 @@ export default function FinancePage() {
         <div style={batchFooter}><span>{batchRows.length} capture rows</span><div style={batchTotalsStyle}><span>Debits <strong>{money(batchTotals.debit)}</strong></span>
           <span>Credits <strong>{money(batchTotals.credit)}</strong></span><span>VAT <strong>{money(batchTotals.vat)}</strong></span></div></div>
       </section>
+      <div style={stickySaveBar} role="region" aria-label="Cashbook saving controls">
+        <div><strong style={saveBarTitle}>{draftSaved ? "Draft saved" : "Cashbook batch not saved"}</strong>
+          <span style={saveBarHint}>{draftSaved ? "Safe on this workstation until it is processed." : "Save your work before leaving this page."}</span></div>
+        <div style={batchActions}><button style={secondaryButton} onClick={saveBatchDraft}>Save Draft</button>
+          <button style={processButton} onClick={processBatch} disabled={processing}>{processing ? "Processing..." : "Process Batch"}</button></div>
+      </div>
       <HistoryPanel title="Posted Cashbook Entries" description="Processed transactions for this property." entries={entries} loading={loading} />
     </>}
 
@@ -349,6 +358,7 @@ const buttonBase:CSSProperties={height:35,borderRadius:7,padding:"0 12px",fontSi
 const batchTableWrap:CSSProperties={overflow:"auto",maxHeight:"34vh"}; const historyWrap:CSSProperties={overflow:"auto",maxHeight:"27vh"}; const table:CSSProperties={width:"100%",borderCollapse:"collapse",fontSize:12}; const th:CSSProperties={position:"sticky",top:0,zIndex:1,textAlign:"left",padding:"9px 8px",background:"#EAF0F5",color:"#526679",fontSize:9,fontWeight:900,textTransform:"uppercase",letterSpacing:.4,borderBottom:"1px solid #C9D5DF",whiteSpace:"nowrap"}; const wideTh:CSSProperties={...th,minWidth:190}; const amountTh:CSSProperties={...th,textAlign:"right"}; const actionTh:CSSProperties={...th,width:34}; const rowNumberHead:CSSProperties={...th,width:34,textAlign:"center"};
 const td:CSSProperties={padding:"9px 10px",borderBottom:"1px solid #EDF1F4",verticalAlign:"middle"}; const batchTd:CSSProperties={padding:3,borderBottom:"1px solid #DDE5EC",borderRight:"1px solid #EDF1F4"}; const rowNumberCell:CSSProperties={...batchTd,textAlign:"center",background:"#F4F7F9",fontWeight:800,color:"#647789"}; const gridInput:CSSProperties={width:"100%",height:33,border:"1px solid transparent",borderRadius:4,padding:"0 7px",fontSize:11,color:"#1D3347",background:"#FFF"}; const moneyInput:CSSProperties={...gridInput,textAlign:"right",minWidth:88}; const removeButton:CSSProperties={width:26,height:26,border:0,borderRadius:5,background:"#EAF4FF",color:"#0D5598",fontSize:17,cursor:"pointer"};
 const batchFooter:CSSProperties={display:"flex",justifyContent:"space-between",alignItems:"center",gap:15,padding:"10px 14px",background:"#F5F8FA",borderTop:"1px solid #DCE5ED",fontSize:10,color:"#647789"}; const batchTotalsStyle:CSSProperties={display:"flex",gap:20,color:"#40566B",flexWrap:"wrap"};
+const stickySaveBar:CSSProperties={position:"sticky",bottom:10,zIndex:5,marginTop:10,padding:"10px 12px",border:"1px solid #AFCBE2",borderRadius:10,background:"rgba(255,255,255,.97)",boxShadow:"0 8px 24px rgba(13,79,145,.18)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:14,flexWrap:"wrap",backdropFilter:"blur(8px)"}; const saveBarTitle:CSSProperties={display:"block",fontSize:12,color:"#123F69"}; const saveBarHint:CSSProperties={display:"block",fontSize:10,color:"#718397",marginTop:2};
 const muted:CSSProperties={fontSize:10,color:"#8492A0",marginTop:2}; const badge:CSSProperties={display:"inline-block",borderRadius:99,padding:"3px 6px",fontSize:9,fontWeight:900,textTransform:"uppercase"}; const miniSelect:CSSProperties={border:"1px solid #C9D5DF",borderRadius:6,padding:"5px",background:"white",fontSize:11}; const emptyCell:CSSProperties={...td,textAlign:"center",padding:35,color:"#7D8D9B"};
 const vatGrid:CSSProperties={display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:12,padding:16}; const note:CSSProperties={margin:"0 16px 16px",padding:11,borderRadius:8,background:"#F5F9FE",color:"#0D4F91",fontSize:11}; const errorBox:CSSProperties={padding:"9px 12px",marginBottom:10,borderRadius:8,background:"#EAF4FF",color:"#0D5598",fontSize:12,fontWeight:700}; const successBox:CSSProperties={padding:"9px 12px",marginBottom:10,borderRadius:8,background:"#EAF4FF",color:"#0D5598",fontSize:12,fontWeight:700};
 const statementHeader:CSSProperties={...panelHeading,alignItems:"flex-end",gap:16,flexWrap:"wrap"}; const dateControls:CSSProperties={display:"flex",gap:8,flexWrap:"wrap"}; const dateLabel:CSSProperties={display:"flex",flexDirection:"column",gap:3,fontSize:9,fontWeight:900,textTransform:"uppercase",color:"#60778C"}; const dateInput:CSSProperties={height:34,border:"1px solid #B8C7D5",borderRadius:7,padding:"0 8px",background:"white",color:"#173E5C",fontWeight:700};
