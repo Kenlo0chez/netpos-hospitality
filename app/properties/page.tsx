@@ -822,7 +822,7 @@ const pageStyle: React.CSSProperties = {
   maxWidth: 1220,
   margin: "0 auto",
   padding: "16px 24px",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
 };
 
 const headerRow: React.CSSProperties = {
@@ -956,9 +956,9 @@ const saveButton: React.CSSProperties = {
 };
 
 const successStyle: React.CSSProperties = {
-  background: "#eaf7ee",
-  border: "1px solid #9ad5a8",
-  color: "#176b2c",
+  background: "#EAF4FF",
+  border: "1px solid #B8D3EA",
+  color: "#0D5598",
   padding: "8px 11px",
   borderRadius: 8,
   marginBottom: 10,

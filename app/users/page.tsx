@@ -1529,7 +1529,7 @@ function roleTitle(
 
 const BLUE = "#0D5FA8";
 const DARK_BLUE = "#0B477F";
-const GREEN = "#16885A";
+const GREEN = "#1268B3";
 const PAGE_BG = "#F4F8FC";
 const TEXT = "#17212B";
 const MUTED = "#6F7D8C";
@@ -1544,7 +1544,7 @@ const pageStyle: CSSProperties = {
   margin: "0 auto",
   padding: "14px 24px 12px",
   boxSizing: "border-box",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
   background: PAGE_BG,
   color: TEXT,
 };
@@ -1670,20 +1670,20 @@ const addUserButton: CSSProperties = {
 const errorBox: CSSProperties = {
   marginBottom: 8,
   padding: "8px 10px",
-  border: "1px solid #E0AAAA",
+  border: "1px solid #B8D3EA",
   borderRadius: 7,
-  background: "#FFF1F1",
-  color: "#A11A1A",
+  background: "#EEF6FF",
+  color: "#0D4F91",
   fontSize: 9,
 };
 
 const successBox: CSSProperties = {
   marginBottom: 8,
   padding: "8px 10px",
-  border: "1px solid #9FCFB5",
+  border: "1px solid #B8D3EA",
   borderRadius: 7,
-  background: "#EAF7F0",
-  color: "#176C46",
+  background: "#EAF4FF",
+  color: "#0D5598",
   fontSize: 9,
   fontWeight: 700,
 };
@@ -1712,7 +1712,7 @@ const summaryBlue: CSSProperties = {
 };
 
 const summaryGreen: CSSProperties = {
-  borderColor: "#AED9C2",
+  borderColor: "#BDD7ED",
   background: "#F7FFF9",
 };
 
@@ -1841,18 +1841,18 @@ const ownerBadge: CSSProperties = {
 };
 
 const managerBadge: CSSProperties = {
-  background: "#F0EAFE",
-  color: "#6841A2",
+  background: "#EAF4FF",
+  color: "#0D5598",
 };
 
 const receptionBadge: CSSProperties = {
-  background: "#EAF7F0",
+  background: "#EAF4FF",
   color: GREEN,
 };
 
 const housekeepingBadge: CSSProperties = {
-  background: "#FFF4D9",
-  color: "#8B6200",
+  background: "#EEF6FF",
+  color: "#0D4F91",
 };
 
 const statusBadge: CSSProperties = {
@@ -1865,7 +1865,7 @@ const statusBadge: CSSProperties = {
 };
 
 const activeBadge: CSSProperties = {
-  background: "#EAF7F0",
+  background: "#EAF4FF",
   color: GREEN,
 };
 
@@ -2085,7 +2085,7 @@ const inputStyle: CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
   padding: "9px 10px",
-  border: "1px solid #AFC0D2",
+  border: "1px solid #B8D3EA",
   borderRadius: 7,
   background: "#fff",
   color: TEXT,

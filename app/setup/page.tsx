@@ -963,7 +963,7 @@ function TabButton({
 
 const BLUE = "#0D5FA8";
 const DARK_BLUE = "#0B477F";
-const GREEN = "#16885A";
+const GREEN = "#1268B3";
 const TEXT = "#17324D";
 const MUTED = "#718196";
 const BORDER = "#D4E1EC";
@@ -976,7 +976,7 @@ const page: CSSProperties = {
   boxSizing: "border-box",
   background: "#F4F8FC",
   color: TEXT,
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
 };
 
 const loadingCard: CSSProperties = {
@@ -1212,9 +1212,9 @@ const emptyState: CSSProperties = {
 const successBox: CSSProperties = {
   marginBottom: 8,
   padding: "8px 10px",
-  border: "1px solid #ACDCC4",
+  border: "1px solid #BDD7ED",
   borderRadius: 7,
-  background: "#ECF9F2",
+  background: "#EDF6FF",
   color: GREEN,
   fontSize: 8,
   fontWeight: 800,
@@ -1223,10 +1223,10 @@ const successBox: CSSProperties = {
 const errorBox: CSSProperties = {
   marginBottom: 8,
   padding: "8px 10px",
-  border: "1px solid #E3B1B1",
+  border: "1px solid #BDD7ED",
   borderRadius: 7,
-  background: "#FFF3F3",
-  color: "#A33B3B",
+  background: "#F5F9FE",
+  color: "#0D4F91",
   fontSize: 8,
 };
 

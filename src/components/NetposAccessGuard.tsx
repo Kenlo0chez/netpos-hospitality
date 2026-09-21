@@ -417,9 +417,9 @@ const loadingPage: CSSProperties = {
   alignItems: "center",
   padding: 20,
   boxSizing: "border-box",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
   background:
-    "linear-gradient(135deg,#F4F9FD 0%,#FFFFFF 55%,#F1FAF6 100%)",
+    "linear-gradient(135deg,#F2F8FE 0%,#FFFFFF 58%,#EAF4FF 100%)",
 };
 
 const loadingCard: CSSProperties = {
@@ -444,7 +444,7 @@ const loadingMark: CSSProperties = {
   alignItems: "center",
   borderRadius: 11,
   background:
-    "linear-gradient(145deg,#0D5FA8,#168257)",
+    "linear-gradient(145deg,#0B4E8A,#1680CF)",
   color: "#FFFFFF",
   fontSize: 23,
   fontWeight: 900,
@@ -453,13 +453,13 @@ const loadingMark: CSSProperties = {
 
 const errorCard: CSSProperties = {
   ...loadingCard,
-  color: "#9A2D2D",
+  color: "#0D4F91",
   textAlign: "center",
 };
 
 const brandBar: CSSProperties = {
-  minHeight: 54,
-  padding: "7px 20px",
+  minHeight: 58,
+  padding: "8px 24px",
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
@@ -467,8 +467,8 @@ const brandBar: CSSProperties = {
   boxSizing: "border-box",
   borderBottom: "1px solid #D9E7F0",
   background:
-    "linear-gradient(100deg,#FFFFFF 0%,#F7FBFE 70%,#F2FAF6 100%)",
-  fontFamily: "Arial, sans-serif",
+    "linear-gradient(100deg,#FFFFFF 0%,#F7FBFF 72%,#EDF6FF 100%)",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
 };
 
 const brandLink: CSSProperties = {
@@ -488,7 +488,7 @@ const brandMark: CSSProperties = {
   flex: "0 0 34px",
   borderRadius: 9,
   background:
-    "linear-gradient(145deg,#0D5FA8 0%,#0E6EA6 55%,#168257 100%)",
+    "linear-gradient(145deg,#0B4E8A 0%,#0D5FA8 56%,#1680CF 100%)",
   color: "#FFFFFF",
   fontSize: 18,
   fontWeight: 900,
@@ -525,8 +525,8 @@ const staffDot: CSSProperties = {
   height: 8,
   flex: "0 0 8px",
   borderRadius: "50%",
-  background: "#168257",
-  boxShadow: "0 0 0 3px #E7F6EF",
+  background: "#1680CF",
+  boxShadow: "0 0 0 3px #E5F2FD",
 };
 
 const staffNameBlock: CSSProperties = {
@@ -564,18 +564,18 @@ const mainNav: CSSProperties = {
   top: 0,
   zIndex: 998,
   background:
-    "linear-gradient(90deg,#0B4E8A 0%,#0D5FA8 68%,#0D668F 100%)",
+    "linear-gradient(90deg,#083A6B 0%,#0B4E8A 48%,#1268B3 100%)",
   borderBottom: "1px solid #083F73",
   boxShadow: "0 4px 13px rgba(13,79,145,.14)",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
 };
 
 const menuInner: CSSProperties = {
   width: "100%",
   display: "flex",
   alignItems: "center",
-  gap: 5,
-  padding: "7px 18px",
+  gap: 4,
+  padding: "7px 24px",
   overflowX: "auto",
   boxSizing: "border-box",
 };
@@ -584,11 +584,11 @@ const menuLink: CSSProperties = {
   flex: "0 0 auto",
   textDecoration: "none",
   color: "#EAF5FD",
-  padding: "11px 16px",
+  padding: "10px 15px",
   border: "1px solid transparent",
   borderRadius: 7,
-  fontSize: 15,
-  fontWeight: 800,
+  fontSize: 14,
+  fontWeight: 750,
   whiteSpace: "nowrap",
 };
 
@@ -601,14 +601,14 @@ const activeMenuLink: CSSProperties = {
 
 const eodMenuLink: CSSProperties = {
   marginLeft: "auto",
-  background: "rgba(22,130,87,.16)",
-  borderColor: "rgba(198,240,219,.30)",
-  color: "#F0FFF8",
+  background: "rgba(255,255,255,.10)",
+  borderColor: "rgba(255,255,255,.28)",
+  color: "#FFFFFF",
 };
 
 const activeEodMenuLink: CSSProperties = {
-  background: "#EAF8F1",
-  color: "#126C49",
-  borderColor: "#B8DFC9",
+  background: "#FFFFFF",
+  color: "#0D4F91",
+  borderColor: "#FFFFFF",
   boxShadow: "0 2px 7px rgba(0,0,0,.10)",
 };

@@ -1436,20 +1436,20 @@ function StatusBadge({
       color: "#0D5DAA",
     },
     accepted: {
-      background: "#E8F8F0",
-      color: "#137A4B",
+      background: "#EAF4FF",
+      color: "#0D5598",
     },
     declined: {
-      background: "#FFF0F0",
-      color: "#A03A3A",
+      background: "#EEF6FF",
+      color: "#0D4F91",
     },
     expired: {
-      background: "#FFF4DF",
-      color: "#976714",
+      background: "#EEF6FF",
+      color: "#0D5598",
     },
     converted: {
-      background: "#EAE9FF",
-      color: "#4E46A5",
+      background: "#EDF6FF",
+      color: "#0D5598",
     },
   };
 
@@ -1523,7 +1523,7 @@ const page: CSSProperties = {
   minHeight: "100vh",
   background: "#F4F8FC",
   color: "#17324D",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
 };
 
 const hero: CSSProperties = {
@@ -1738,9 +1738,9 @@ const smallButton: CSSProperties = {
 
 const acceptButton: CSSProperties = {
   ...smallButton,
-  border: "1px solid #9BD7B8",
-  color: "#137A4B",
-  background: "#F0FBF5",
+  border: "1px solid #B8D3EA",
+  color: "#0D5598",
+  background: "#F5F9FE",
 };
 
 const convertButton: CSSProperties = {
@@ -1769,9 +1769,9 @@ const errorBox: CSSProperties = {
   marginBottom: 10,
   padding: "9px 11px",
   borderRadius: 7,
-  border: "1px solid #F0B6B6",
-  background: "#FFF3F3",
-  color: "#A33B3B",
+  border: "1px solid #B8D3EA",
+  background: "#F5F9FE",
+  color: "#0D4F91",
   fontSize: 9,
 };
 
@@ -1779,9 +1779,9 @@ const successBox: CSSProperties = {
   marginBottom: 10,
   padding: "9px 11px",
   borderRadius: 7,
-  border: "1px solid #A9DFC4",
-  background: "#F0FBF5",
-  color: "#137A4B",
+  border: "1px solid #BDD7ED",
+  background: "#F5F9FE",
+  color: "#0D5598",
   fontSize: 9,
 };
 

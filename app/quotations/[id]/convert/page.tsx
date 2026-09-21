@@ -1335,10 +1335,10 @@ const warningBox: CSSProperties = {
   marginTop: 12,
   padding: 10,
   border:
-    "1px solid #F0C67A",
+    "1px solid #95B7DD",
   borderRadius: 7,
-  background: "#FFF8E9",
-  color: "#8B641B",
+  background: "#F5F9FE",
+  color: "#0D4F91",
   fontSize: 9,
   lineHeight: 1.5,
 };
@@ -1347,27 +1347,27 @@ const roomSelectedBox: CSSProperties = {
   marginTop: 13,
   padding: 14,
   border:
-    "1px solid #A8DCC2",
+    "1px solid #BDD7ED",
   borderRadius: 9,
-  background: "#F0FBF5",
+  background: "#F5F9FE",
 };
 
 const selectedLabel: CSSProperties = {
-  color: "#178A57",
+  color: "#1268B3",
   fontSize: 7,
   fontWeight: 900,
 };
 
 const selectedRoomNumber: CSSProperties = {
   marginTop: 4,
-  color: "#116D45",
+  color: "#0D5598",
   fontSize: 21,
   fontWeight: 900,
 };
 
 const selectedRoomMeta: CSSProperties = {
   marginTop: 3,
-  color: "#587467",
+  color: "#647D94",
   fontSize: 9,
 };
 
@@ -1387,7 +1387,7 @@ const confirmButton: CSSProperties = {
   border: 0,
   borderRadius: 8,
   padding: "11px 13px",
-  background: "#178A57",
+  background: "#1268B3",
   color: "#fff",
   fontSize: 10,
   fontWeight: 900,
@@ -1399,10 +1399,10 @@ const errorBox: CSSProperties = {
   margin: "0 auto 12px",
   padding: "10px 12px",
   border:
-    "1px solid #F0B6B6",
+    "1px solid #B8D3EA",
   borderRadius: 7,
-  background: "#FFF3F3",
-  color: "#A33B3B",
+  background: "#F5F9FE",
+  color: "#0D4F91",
   fontSize: 9,
 };
 
@@ -1411,10 +1411,10 @@ const successBox: CSSProperties = {
   margin: "0 auto 12px",
   padding: "10px 12px",
   border:
-    "1px solid #A9DFC4",
+    "1px solid #BDD7ED",
   borderRadius: 7,
-  background: "#F0FBF5",
-  color: "#137A4B",
+  background: "#F5F9FE",
+  color: "#0D5598",
   fontSize: 9,
 };
 

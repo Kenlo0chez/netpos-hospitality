@@ -317,13 +317,13 @@ export default function ReservationAccountsPage() {
                     <td style={tdRight}>
                       {money(account.reservation.total_amount)}
                     </td>
-                    <td style={{ ...tdRight, color: "#168257", fontWeight: 800 }}>
+                    <td style={{ ...tdRight, color: "#1268B3", fontWeight: 800 }}>
                       {money(account.paid)}
                     </td>
                     <td
                       style={{
                         ...tdRight,
-                        color: account.balance > 0.005 ? "#0D4F91" : "#168257",
+                        color: account.balance > 0.005 ? "#0D4F91" : "#1268B3",
                         fontWeight: 900,
                       }}
                     >
@@ -373,7 +373,7 @@ function Summary({
       <strong
         style={{
           ...summaryValue,
-          color: positive ? "#168257" : emphasis ? "#0D4F91" : "#173F67",
+          color: positive ? "#1268B3" : emphasis ? "#0D4F91" : "#173F67",
         }}
       >
         {value}
@@ -407,7 +407,7 @@ const page: CSSProperties = {
   minHeight: "100vh",
   background: "#F4F8FC",
   color: "#17324D",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
   padding: "14px 22px 28px",
 };
 const header: CSSProperties = {
@@ -555,6 +555,6 @@ const stateBox: CSSProperties = {
 };
 const errorBox: CSSProperties = {
   ...stateBox,
-  color: "#A11A1A",
-  background: "#FFF5F5",
+  color: "#0D4F91",
+  background: "#F5F9FE",
 };

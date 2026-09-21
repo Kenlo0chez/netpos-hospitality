@@ -148,7 +148,7 @@ export default function RoomTypesPage() {
         maxWidth: 900,
         margin: "0 auto",
         padding: 32,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
       }}
     >
       <h1>Room Type Setup</h1>

@@ -176,7 +176,7 @@ export default function RoomsPage() {
         maxWidth: 950,
         margin: "0 auto",
         padding: 32,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
       }}
     >
       <h1>Room Setup</h1>
@@ -443,8 +443,8 @@ export default function RoomsPage() {
                     borderRadius: 999,
                     background:
                       room.operational_status === "active"
-                        ? "#dcfce7"
-                        : "#fee2e2",
+                        ? "#DDEBFA"
+                        : "#DDEBFA",
                     fontSize: 12,
                     fontWeight: 700,
                     textTransform: "capitalize",
@@ -462,10 +462,10 @@ export default function RoomsPage() {
                     borderRadius: 999,
                     background:
                       room.housekeeping_status === "clean"
-                        ? "#dcfce7"
+                        ? "#DDEBFA"
                         : room.housekeeping_status === "dirty"
-                        ? "#fee2e2"
-                        : "#fef3c7",
+                        ? "#DDEBFA"
+                        : "#DDEBFA",
                     fontSize: 12,
                     fontWeight: 700,
                     textTransform: "capitalize",

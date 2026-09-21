@@ -422,7 +422,7 @@ const page: CSSProperties = {
   padding: "10px 16px 12px",
   background: "#F4F8FC",
   color: "#17324D",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
   boxSizing: "border-box",
 };
 
@@ -553,8 +553,8 @@ const button: CSSProperties = {
 
 const primaryButton: CSSProperties = {
   ...button,
-  background: "#168257",
-  borderColor: "#168257",
+  background: "#1268B3",
+  borderColor: "#1268B3",
   color: "#fff",
   fontWeight: 800,
 };
@@ -583,18 +583,18 @@ const badge: CSSProperties = {
 };
 
 const cleanBadge: CSSProperties = {
-  background: "#EAF7F0",
-  color: "#168257",
+  background: "#EAF4FF",
+  color: "#1268B3",
 };
 
 const dirtyBadge: CSSProperties = {
-  background: "#FFF0F0",
-  color: "#A32626",
+  background: "#EEF6FF",
+  color: "#0D4F91",
 };
 
 const cleaningBadge: CSSProperties = {
-  background: "#FFF8DD",
-  color: "#866D00",
+  background: "#EEF6FF",
+  color: "#0D4F91",
 };
 
 const outBadge: CSSProperties = {
@@ -606,8 +606,8 @@ const successBox: CSSProperties = {
   marginBottom: 7,
   padding: "6px 9px",
   borderRadius: 6,
-  background: "#EAF7F0",
-  color: "#168257",
+  background: "#EAF4FF",
+  color: "#1268B3",
   fontSize: 9,
 };
 
@@ -615,8 +615,8 @@ const errorBox: CSSProperties = {
   marginBottom: 7,
   padding: "6px 9px",
   borderRadius: 6,
-  background: "#FFF0F0",
-  color: "#A32626",
+  background: "#EEF6FF",
+  color: "#0D4F91",
   fontSize: 9,
 };
 
@@ -644,7 +644,7 @@ const finishButton: CSSProperties = {
   padding: "7px 13px",
   border: 0,
   borderRadius: 6,
-  background: "#168257",
+  background: "#1268B3",
   color: "#fff",
   fontSize: 8,
   fontWeight: 800,

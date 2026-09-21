@@ -2558,9 +2558,9 @@ const rateSuccess: React.CSSProperties = {
   marginTop: 8,
   padding: "7px 9px",
   borderRadius: 7,
-  background: "#eaf7ee",
-  border: "1px solid #9ad5a8",
-  color: "#176b2c",
+  background: "#EAF4FF",
+  border: "1px solid #B8D3EA",
+  color: "#0D5598",
   fontSize: 10,
   fontWeight: 700,
 };
@@ -2569,9 +2569,9 @@ const rateWarning: React.CSSProperties = {
   marginTop: 8,
   padding: "7px 9px",
   borderRadius: 7,
-  background: "#fff6df",
-  border: "1px solid #e5c875",
-  color: "#795900",
+  background: "#EEF6FF",
+  border: "1px solid #95B7DD",
+  color: "#0D4F91",
   fontSize: 10,
   fontWeight: 700,
 };
@@ -2703,9 +2703,9 @@ const helpText: React.CSSProperties = {
 };
 
 const successStyle: React.CSSProperties = {
-  background: "#eaf7ee",
-  border: "1px solid #9ad5a8",
-  color: "#176b2c",
+  background: "#EAF4FF",
+  border: "1px solid #B8D3EA",
+  color: "#0D5598",
   borderRadius: 8,
   padding: "8px 10px",
   marginBottom: 9,

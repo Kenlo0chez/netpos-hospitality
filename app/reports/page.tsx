@@ -1922,20 +1922,20 @@ function KpiCard({
       background: "#F5FAFF",
     },
     green: {
-      borderColor: "#B5DEC7",
-      background: "#F5FFF9",
+      borderColor: "#B8D3EA",
+      background: "#F5F9FE",
     },
     gold: {
-      borderColor: "#E7CF95",
-      background: "#FFFCF3",
+      borderColor: "#B8D3EA",
+      background: "#F8FBFF",
     },
     purple: {
-      borderColor: "#D3C5ED",
-      background: "#FBF8FF",
+      borderColor: "#BDD7ED",
+      background: "#F8FBFF",
     },
     red: {
-      borderColor: "#E8BBBB",
-      background: "#FFF8F8",
+      borderColor: "#B8D3EA",
+      background: "#F8FBFF",
     },
     neutral: {
       borderColor: "#CBD6E2",
@@ -2020,11 +2020,11 @@ function PieChart({
 
   const palette = [
     "#2E6EDB",
-    "#22945B",
-    "#F39A17",
-    "#8154C5",
+    "#1268B3",
+    "#1680CF",
+    "#1268B3",
     "#1D9BB3",
-    "#D65858",
+    "#1680CF",
     "#66798D",
   ];
 
@@ -2252,8 +2252,8 @@ function escapeHtml(value: string) {
 
 const BLUE = "#0D5FA8";
 const DARK_BLUE = "#0B477F";
-const GREEN = "#16885A";
-const RED = "#A32626";
+const GREEN = "#1268B3";
+const RED = "#0D4F91";
 const PAGE_BG = "#F4F8FC";
 const TEXT = "#17212B";
 const MUTED = "#6F7D8C";
@@ -2270,7 +2270,7 @@ const pageStyle: CSSProperties = {
   boxSizing: "border-box",
   background: PAGE_BG,
   color: TEXT,
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
 };
 
 const brandHeader: CSSProperties = {
@@ -2376,7 +2376,7 @@ const dateArrow: CSSProperties = {
 };
 
 const runButton: CSSProperties = {
-  border: "1px solid #2AB673",
+  border: "1px solid #1680CF",
   borderRadius: 7,
   padding: "9px 12px",
   background: GREEN,
@@ -2416,7 +2416,7 @@ const headingActions: CSSProperties = {
 const whatsAppInput: CSSProperties = {
   width: 185,
   height: 31,
-  border: "1px solid #AFC0D2",
+  border: "1px solid #B8D3EA",
   borderRadius: 6,
   padding: "0 9px",
   color: DARK_BLUE,
@@ -2424,7 +2424,7 @@ const whatsAppInput: CSSProperties = {
 };
 
 const secondaryButton: CSSProperties = {
-  border: "1px solid #AFC0D2",
+  border: "1px solid #B8D3EA",
   borderRadius: 6,
   padding: "7px 10px",
   background: "#fff",
@@ -2443,17 +2443,17 @@ const printButton: CSSProperties = {
 
 const whatsAppButton: CSSProperties = {
   ...secondaryButton,
-  borderColor: "#128C7E",
-  background: "#128C7E",
+  borderColor: "#1268B3",
+  background: "#1268B3",
   color: "#fff",
 };
 
 const errorBox: CSSProperties = {
   marginBottom: 7,
   padding: "7px 9px",
-  border: "1px solid #E2A9A9",
+  border: "1px solid #B8D3EA",
   borderRadius: 7,
-  background: "#FFF2F2",
+  background: "#EEF6FF",
   color: RED,
   fontSize: 8,
 };

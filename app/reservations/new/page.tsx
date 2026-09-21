@@ -2284,7 +2284,7 @@ const pageStyle: React.CSSProperties = {
   maxWidth: 1050,
   margin: "0 auto",
   padding: "24px 28px 50px",
-  fontFamily: "Arial, sans-serif", color: "#17324D", background: "#F4F8FC", minHeight: "100vh",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif', color: "#17324D", background: "#F4F8FC", minHeight: "100vh",
 };
 
 const pageHeader: React.CSSProperties = {
@@ -2386,9 +2386,9 @@ const progressCircleActive: React.CSSProperties = {
 };
 
 const progressCircleDone: React.CSSProperties = {
-  background: "#176332",
+  background: "#0D5598",
   color: "white",
-  borderColor: "#176332",
+  borderColor: "#0D5598",
 };
 
 const progressLabel: React.CSSProperties = {
@@ -2462,9 +2462,9 @@ const calendarPrefillNotice: React.CSSProperties = {
   gap: 12,
   borderWidth: 1,
   borderStyle: "solid",
-  borderColor: "#acd0b8",
+  borderColor: "#BDD7ED",
   background: "#f1faf4",
-  color: "#245d35",
+  color: "#0D4F91",
   borderRadius: 8,
   padding: "9px 11px",
   marginBottom: 18,
@@ -2630,24 +2630,24 @@ const checkingStyle: React.CSSProperties = {
 
 const availableStyle: React.CSSProperties = {
   background: "#eff9f2",
-  color: "#1d6735",
+  color: "#0D5598",
   padding: 11,
   borderRadius: 8,
   fontSize: 10,
   borderWidth: 1,
   borderStyle: "solid",
-  borderColor: "#aad0b6",
+  borderColor: "#B8D3EA",
 };
 
 const unavailableStyle: React.CSSProperties = {
-  background: "#FFF3F3",
-  color: "#A33B3B",
+  background: "#F5F9FE",
+  color: "#0D4F91",
   padding: 11,
   borderRadius: 8,
   fontSize: 10,
   borderWidth: 1,
   borderStyle: "solid",
-  borderColor: "#e3a6a6",
+  borderColor: "#B8D3EA",
 };
 
 const statusSubtext: React.CSSProperties = {
@@ -2721,7 +2721,7 @@ const guestSelectedCard: React.CSSProperties = {
   marginTop: 16,
   borderWidth: 1,
   borderStyle: "solid",
-  borderColor: "#a8c9b3",
+  borderColor: "#B8D3EA",
   background: "#f2faf4",
   borderRadius: 9,
   padding: 12,
@@ -2731,7 +2731,7 @@ const guestAvatar: React.CSSProperties = {
   width: 37,
   height: 37,
   borderRadius: "50%",
-  background: "#176332",
+  background: "#0D5598",
   color: "white",
   display: "flex",
   alignItems: "center",
@@ -2751,7 +2751,7 @@ const guestMeta: React.CSSProperties = {
 };
 
 const selectedBadge: React.CSSProperties = {
-  background: "#176332",
+  background: "#0D5598",
   color: "white",
   padding: "5px 8px",
   borderRadius: 20,
@@ -2849,7 +2849,7 @@ const finalButtons: React.CSSProperties = {
 
 const confirmButton: React.CSSProperties = {
   borderWidth: 0,
-  background: "#176332",
+  background: "#0D5598",
   color: "white",
   borderRadius: 8,
   padding: "10px 16px",

@@ -332,7 +332,7 @@ export default function RatesPage() {
         maxWidth: 900,
         margin: "0 auto",
         padding: 32,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
       }}
     >
       <h1 style={{ marginBottom: 6 }}>
@@ -1053,9 +1053,9 @@ const twoColumns: React.CSSProperties = {
 };
 
 const successStyle: React.CSSProperties = {
-  background: "#eaf7ee",
-  border: "1px solid #9ad5a8",
-  color: "#176b2c",
+  background: "#EAF4FF",
+  border: "1px solid #B8D3EA",
+  color: "#0D5598",
   padding: 14,
   borderRadius: 10,
   marginBottom: 20,

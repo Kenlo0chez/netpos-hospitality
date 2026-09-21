@@ -1305,13 +1305,13 @@ function StatusBadge({
   if (status === "confirmed") {
     background = "#E8F3FC";
     color = "#0D5FA8";
-    borderColor = "#B9D5EA";
+    borderColor = "#B8D3EA";
   }
 
   if (status === "checked_in") {
-    background = "#EAF8F1";
-    color = "#14714C";
-    borderColor = "#B8DDCA";
+    background = "#EAF4FF";
+    color = "#0D5598";
+    borderColor = "#B8D3EA";
   }
 
   if (status === "provisional") {
@@ -1324,9 +1324,9 @@ function StatusBadge({
     status === "cancelled" ||
     status === "no_show"
   ) {
-    background = "#fff0f0";
-    color = "#a11a1a";
-    borderColor = "#e4a0a0";
+    background = "#EEF6FF";
+    color = "#0D4F91";
+    borderColor = "#B8D3EA";
   }
 
   return (
@@ -1552,18 +1552,18 @@ function formatDayName(
 
 const BLUE = "#0D5FA8";
 const DARK_BLUE = "#0D4F91";
-const GREEN = "#168257";
+const GREEN = "#1268B3";
 const TEXT = "#183A59";
 const MUTED = "#71869A";
 const BORDER = "#D2E0EA";
 const LIGHT_BLUE = "#EDF6FE";
-const LIGHT_GREEN = "#ECF8F2";
+const LIGHT_GREEN = "#EDF6FF";
 
 const pageStyle: React.CSSProperties = {
   maxWidth: 1600,
   margin: "0 auto",
   padding: "8px 14px 10px",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
   color: TEXT,
   background: "linear-gradient(180deg,#F7FAFD 0%,#F5F8FB 100%)",
   minHeight: "calc(100vh - 100px)",
@@ -1636,7 +1636,7 @@ const activeViewButton: React.CSSProperties = {
 };
 
 const housekeepingButton: React.CSSProperties = {
-  border: "1px solid #B9DDCA",
+  border: "1px solid #BDD7ED",
   background: LIGHT_GREEN,
   color: GREEN,
   borderRadius: 7,
@@ -2070,13 +2070,13 @@ const continuationMark: React.CSSProperties = {
 const confirmedCell: React.CSSProperties = {
   background: "#E8F3FC",
   color: "#0D5FA8",
-  borderColor: "#B9D5EA",
+  borderColor: "#B8D3EA",
 };
 
 const checkedInCell: React.CSSProperties = {
-  background: "#EAF8F1",
-  color: "#14714C",
-  borderColor: "#B8DDCA",
+  background: "#EAF4FF",
+  color: "#0D5598",
+  borderColor: "#B8D3EA",
 };
 
 const provisionalCell: React.CSSProperties = {
@@ -2111,7 +2111,7 @@ const boardHint: React.CSSProperties = {
 
 const bottomHousekeepingButton: React.CSSProperties = {
   minWidth: 125,
-  border: "1px solid #B9DDCA",
+  border: "1px solid #BDD7ED",
   background: LIGHT_GREEN,
   color: GREEN,
   borderRadius: 6,

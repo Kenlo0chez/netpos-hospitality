@@ -3042,7 +3042,7 @@ export default function ReservationDetailsPage() {
                       color:
                         balanceOutstanding > 0
                           ? "#0D4F91"
-                          : "#168257",
+                          : "#1268B3",
                     }}
                   >
                     N$
@@ -3367,8 +3367,8 @@ export default function ReservationDetailsPage() {
                             color:
                               payment.transaction_type ===
                               "refund"
-                                ? "#A85B3A"
-                                : "#168257",
+                                ? "#0D5598"
+                                : "#1268B3",
                           }}
                         >
                           {payment.transaction_type ===
@@ -4016,9 +4016,9 @@ function StatusBadge({
     }
   > = {
     provisional: {
-      background: "#fff7df",
-      border: "#e2c878",
-      color: "#755600",
+      background: "#EEF6FF",
+      border: "#95B7DD",
+      color: "#0D4F91",
     },
 
     confirmed: {
@@ -4028,27 +4028,27 @@ function StatusBadge({
     },
 
     checked_in: {
-      background: "#f1eaff",
-      border: "#c8afe8",
-      color: "#5a2e91",
+      background: "#EEF6FF",
+      border: "#B8D3EA",
+      color: "#0D4F91",
     },
 
     checked_out: {
-      background: "#edf8f0",
-      border: "#acd0b8",
-      color: "#176332",
+      background: "#EDF6FF",
+      border: "#BDD7ED",
+      color: "#0D5598",
     },
 
     cancelled: {
-      background: "#fff0f0",
-      border: "#e4a0a0",
-      color: "#a11a1a",
+      background: "#EEF6FF",
+      border: "#B8D3EA",
+      color: "#0D4F91",
     },
 
     no_show: {
-      background: "#fff1e8",
-      border: "#e5b28b",
-      color: "#994b13",
+      background: "#F5F9FE",
+      border: "#B8D3EA",
+      color: "#0D5598",
     },
   };
 
@@ -4129,7 +4129,7 @@ function SummaryTile({
           fontSize: 15,
           color:
             positive
-              ? "#168257"
+              ? "#1268B3"
               : emphasis
               ? "#0D4F91"
               : "#183A59",
@@ -4188,15 +4188,15 @@ function StatusPill({
         ...statusPill,
         color:
           positive
-            ? "#168257"
+            ? "#1268B3"
             : "#0D4F91",
         background:
           positive
-            ? "#EAF8F1"
+            ? "#EAF4FF"
             : "#EAF4FD",
         borderColor:
           positive
-            ? "#B5DDC9"
+            ? "#B8D3EA"
             : "#BDD7ED",
       }}
     >
@@ -4538,7 +4538,7 @@ const pageStyle: CSSProperties = {
   maxWidth: 1380,
   margin: "0 auto",
   padding: "14px 22px 28px",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
   boxSizing: "border-box",
   color: "#183A59",
 };
@@ -4834,24 +4834,24 @@ const editButton: CSSProperties = {
 
 const noShowButton: CSSProperties = {
   ...secondaryButton,
-  borderColor: "#d79a69",
-  background: "#fff5ec",
-  color: "#994b13",
+  borderColor: "#95B7DD",
+  background: "#F5F9FE",
+  color: "#0D5598",
   fontWeight: 900,
 };
 
 const cancelButton: CSSProperties = {
   ...secondaryButton,
-  borderColor: "#d6a0a0",
-  background: "#fff3f3",
-  color: "#a11a1a",
+  borderColor: "#B8D3EA",
+  background: "#F5F9FE",
+  color: "#0D4F91",
   fontWeight: 800,
 };
 
 const finishButton: CSSProperties = {
   borderWidth: 0,
   borderRadius: 6,
-  background: "#176332",
+  background: "#0D5598",
   color: "#fff",
   padding: "8px 13px",
   fontSize: 9,
@@ -4865,8 +4865,8 @@ const housekeepingPageButton: CSSProperties = {
   borderStyle: "solid",
   borderColor: "#afd0b7",
   borderRadius: 7,
-  background: "#edf8f0",
-  color: "#176332",
+  background: "#EDF6FF",
+  color: "#0D5598",
   padding: "8px",
   fontSize: 9,
   fontWeight: 900,
@@ -4878,10 +4878,10 @@ const successBox: CSSProperties = {
   padding: "6px 9px",
   borderWidth: 1,
   borderStyle: "solid",
-  borderColor: "#acd0b8",
+  borderColor: "#BDD7ED",
   borderRadius: 6,
-  background: "#edf8f0",
-  color: "#176332",
+  background: "#EDF6FF",
+  color: "#0D5598",
   fontSize: 9,
   fontWeight: 700,
 };
@@ -4891,31 +4891,31 @@ const cancelledBox: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 2,
-  borderColor: "#e4a0a0",
-  background: "#fff0f0",
-  color: "#a11a1a",
+  borderColor: "#B8D3EA",
+  background: "#EEF6FF",
+  color: "#0D4F91",
 };
 
 const noShowNotice: CSSProperties = {
   ...cancelledBox,
-  borderColor: "#e5b28b",
-  background: "#fff5ec",
-  color: "#994b13",
+  borderColor: "#B8D3EA",
+  background: "#F5F9FE",
+  color: "#0D5598",
 };
 
 const checkoutNotice: CSSProperties = {
   ...cancelledBox,
   borderColor: "#afd0b7",
-  background: "#edf8f0",
-  color: "#176332",
+  background: "#EDF6FF",
+  color: "#0D5598",
 };
 
 const errorBox: CSSProperties = {
   marginTop: 15,
   borderRadius: 8,
   padding: 15,
-  background: "#fff0f0",
-  color: "#a11a1a",
+  background: "#EEF6FF",
+  color: "#0D4F91",
 };
 
 const modalOverlay: CSSProperties = {
@@ -5027,21 +5027,21 @@ const cleanHousekeepingBadge: CSSProperties = {
   ...housekeepingBadgeBase,
   borderColor: "#9ac5a4",
   background: "#eaf7ed",
-  color: "#176332",
+  color: "#0D5598",
 };
 
 const dirtyHousekeepingBadge: CSSProperties = {
   ...housekeepingBadgeBase,
-  borderColor: "#dfa4a4",
-  background: "#ffeded",
-  color: "#992626",
+  borderColor: "#B8D3EA",
+  background: "#EAF4FF",
+  color: "#0D4F91",
 };
 
 const cleaningHousekeepingBadge: CSSProperties = {
   ...housekeepingBadgeBase,
-  borderColor: "#d8c36d",
-  background: "#fff7d9",
-  color: "#6c5600",
+  borderColor: "#95B7DD",
+  background: "#EEF6FF",
+  color: "#0D4F91",
 };
 
 // =========================================================
@@ -5231,7 +5231,7 @@ const greenActionButton: CSSProperties = {
   border: 0,
   borderRadius: 7,
   padding: "7px 10px",
-  background: "#168257",
+  background: "#1268B3",
   color: "#FFFFFF",
   fontSize: 8,
   fontWeight: 900,
@@ -5342,7 +5342,7 @@ const folioPaymentButton: CSSProperties = {
   border: 0,
   borderRadius: 8,
   padding: "9px 10px",
-  background: "#168257",
+  background: "#1268B3",
   color: "#FFFFFF",
   fontSize: 9,
   fontWeight: 900,
@@ -5350,9 +5350,9 @@ const folioPaymentButton: CSSProperties = {
 };
 
 const greenText: CSSProperties = {
-  color: "#168257",
+  color: "#1268B3",
 };
 
 const refundText: CSSProperties = {
-  color: "#A85B3A",
+  color: "#0D5598",
 };

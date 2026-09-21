@@ -1848,13 +1848,13 @@ const DARK_BLUE =
   "#0B477F";
 
 const GREEN =
-  "#16885A";
+  "#1268B3";
 
 const LIGHT_GREEN =
-  "#EAF7F0";
+  "#EAF4FF";
 
 const RED =
-  "#A32626";
+  "#0D4F91";
 
 const PAGE_BG =
   "#F4F8FC";
@@ -1875,7 +1875,7 @@ const pageStyle: CSSProperties = {
   margin: "0 auto",
   padding: "14px 24px 12px",
   boxSizing: "border-box",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
   color: TEXT,
   background: PAGE_BG,
 };
@@ -2030,9 +2030,9 @@ const closedBadge: CSSProperties = {
 const errorBox: CSSProperties = {
   marginBottom: 8,
   padding: "8px 10px",
-  border: "1px solid #E0AAAA",
+  border: "1px solid #B8D3EA",
   borderRadius: 7,
-  background: "#FFF1F1",
+  background: "#EEF6FF",
   color: RED,
   fontSize: 9,
 };
@@ -2040,10 +2040,10 @@ const errorBox: CSSProperties = {
 const successBox: CSSProperties = {
   marginBottom: 8,
   padding: "8px 10px",
-  border: "1px solid #9FCFB5",
+  border: "1px solid #B8D3EA",
   borderRadius: 7,
   background: LIGHT_GREEN,
-  color: "#176C46",
+  color: "#0D5598",
   fontSize: 9,
   fontWeight: 700,
 };
@@ -2072,13 +2072,13 @@ const summaryBlue: CSSProperties = {
 };
 
 const summaryGreen: CSSProperties = {
-  borderColor: "#AED9C2",
+  borderColor: "#BDD7ED",
   background: "#FAFFFC",
 };
 
 const summaryRed: CSSProperties = {
-  borderColor: "#E5B7B7",
-  background: "#FFF9F9",
+  borderColor: "#BDD7ED",
+  background: "#F8FBFF",
 };
 
 const summaryLabel: CSSProperties = {
@@ -2204,7 +2204,7 @@ const transactionPayment: CSSProperties = {
 };
 
 const transactionRefund: CSSProperties = {
-  background: "#FFF0F0",
+  background: "#EEF6FF",
   color: RED,
 };
 
@@ -2235,7 +2235,7 @@ const cancellationHeader: CSSProperties = {
   padding: "7px 10px",
   display: "flex",
   justifyContent: "space-between",
-  background: "#FFF9F9",
+  background: "#F8FBFF",
   color: RED,
   fontSize: 8,
 };

@@ -256,9 +256,9 @@ const page: CSSProperties = {
   justifyContent: "center",
   padding: 20,
   boxSizing: "border-box",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
   background:
-    "linear-gradient(135deg,#082F5F 0%,#0D4D91 48%,#176F68 100%)",
+    "linear-gradient(135deg,#082F5F 0%,#0D4D91 48%,#1680CF 100%)",
 };
 
 const loginCard: CSSProperties = {
@@ -313,7 +313,7 @@ const welcomeArea: CSSProperties = {
 };
 
 const eyebrow: CSSProperties = {
-  color: "#178A57",
+  color: "#1268B3",
   fontSize: 8,
   fontWeight: 900,
   letterSpacing: 0.8,
@@ -348,7 +348,7 @@ const input: CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
   padding: "11px 12px",
-  border: "1px solid #AFC0D2",
+  border: "1px solid #B8D3EA",
   borderRadius: 8,
   outline: "none",
   color: "#17212B",
@@ -359,7 +359,7 @@ const input: CSSProperties = {
 const passwordWrap: CSSProperties = {
   display: "flex",
   alignItems: "stretch",
-  border: "1px solid #AFC0D2",
+  border: "1px solid #B8D3EA",
   borderRadius: 8,
   overflow: "hidden",
   background: "#fff",
@@ -392,7 +392,7 @@ const loginButton: CSSProperties = {
   padding: "11px 14px",
   border: 0,
   borderRadius: 8,
-  background: "#178A57",
+  background: "#1268B3",
   color: "#fff",
   fontSize: 10,
   fontWeight: 900,
@@ -402,10 +402,10 @@ const loginButton: CSSProperties = {
 const errorBox: CSSProperties = {
   marginBottom: 8,
   padding: "9px 10px",
-  border: "1px solid #E0AAAA",
+  border: "1px solid #B8D3EA",
   borderRadius: 7,
-  background: "#FFF1F1",
-  color: "#A11A1A",
+  background: "#EEF6FF",
+  color: "#0D4F91",
   fontSize: 9,
 };
 

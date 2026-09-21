@@ -1329,7 +1329,7 @@ export default function GuestsPage() {
 
                             color:
                               guest.outstanding > 0
-                                ? "#A56600"
+                                ? "#0D5598"
                                 : GREEN,
                           }}
                         >
@@ -1800,8 +1800,8 @@ const BLUE = "#0D5FA8";
 const DARK_BLUE = "#0B477F";
 const LIGHT_BLUE = "#EAF3FF";
 
-const GREEN = "#16885A";
-const LIGHT_GREEN = "#EAF7F0";
+const GREEN = "#1268B3";
+const LIGHT_GREEN = "#EAF4FF";
 
 const PAGE_BG = "#F4F8FC";
 const TEXT = "#17212B";
@@ -1817,7 +1817,7 @@ const pageStyle: CSSProperties = {
   margin: "0 auto",
   padding: "14px 24px 12px",
   boxSizing: "border-box",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
   color: TEXT,
   background: PAGE_BG,
 };
@@ -1975,7 +1975,7 @@ const activeNavigationButton: CSSProperties = {
 const successBox: CSSProperties = {
   marginBottom: 8,
   padding: "7px 10px",
-  border: "1px solid #A9D5BC",
+  border: "1px solid #B8D3EA",
   borderRadius: 7,
   background: LIGHT_GREEN,
   color: GREEN,
@@ -1986,10 +1986,10 @@ const successBox: CSSProperties = {
 const errorBox: CSSProperties = {
   marginBottom: 8,
   padding: "7px 10px",
-  border: "1px solid #E0AAAA",
+  border: "1px solid #B8D3EA",
   borderRadius: 7,
-  background: "#FFF1F1",
-  color: "#A11A1A",
+  background: "#EEF6FF",
+  color: "#0D4F91",
   fontSize: 9,
 };
 
@@ -2018,13 +2018,13 @@ const summaryBlue: CSSProperties = {
 };
 
 const summaryGreen: CSSProperties = {
-  borderColor: "#AED9C2",
-  background: "#FAFFFC",
+  borderColor: "#BDD7ED",
+  background: "#F8FBFF",
 };
 
 const summaryWarning: CSSProperties = {
-  borderColor: "#E5C795",
-  background: "#FFFDF8",
+  borderColor: "#B8D3EA",
+  background: "#F8FBFF",
 };
 
 const summaryLabel: CSSProperties = {
@@ -2100,7 +2100,7 @@ const formSubtitle: CSSProperties = {
 };
 
 const newGuestSmallButton: CSSProperties = {
-  border: "1px solid #9ECDB5",
+  border: "1px solid #B8D3EA",
   borderRadius: 6,
   background: LIGHT_GREEN,
   color: GREEN,
@@ -2125,7 +2125,7 @@ const fieldLabel: CSSProperties = {
 };
 
 const requiredMark: CSSProperties = {
-  color: "#A11A1A",
+  color: "#0D4F91",
   marginLeft: 3,
 };
 

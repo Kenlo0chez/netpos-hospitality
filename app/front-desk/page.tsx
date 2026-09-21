@@ -1874,7 +1874,7 @@ function Panel({
           ...(accent === "green"
             ? {
                 borderLeftColor:
-                  "#1f9d62",
+                  "#1268B3",
               }
             : accent ===
               "warning"
@@ -1901,9 +1901,9 @@ function Panel({
                 ...(accent === "green"
                   ? {
                       background:
-                        "#eaf7f0",
+                        "#EAF4FF",
                       color:
-                        "#187c4e",
+                        "#1268B3",
                     }
                   : accent ===
                     "warning"
@@ -2618,8 +2618,8 @@ function formatShortDate(
 const BLUE = "#0D5FA8";
 const DARK_BLUE = "#0D4F91";
 const LIGHT_BLUE = "#EDF6FE";
-const GREEN = "#168257";
-const LIGHT_GREEN = "#ECF8F2";
+const GREEN = "#1268B3";
+const LIGHT_GREEN = "#EDF6FF";
 const PAGE_BG = "#F6F9FC";
 const TEXT = "#183A59";
 const MUTED = "#71869A";
@@ -2633,7 +2633,7 @@ const pageStyle: CSSProperties = {
   maxWidth: 1500,
   margin: "0 auto",
   padding: "12px 22px 10px",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
   color: TEXT,
   background:
     "linear-gradient(180deg,#F7FAFD 0%,#F5F8FB 100%)",
@@ -2754,7 +2754,7 @@ const summaryBlue: CSSProperties = {
 };
 
 const summaryGreen: CSSProperties = {
-  borderColor: "#C8E2D5",
+  borderColor: "#CFE7FF",
   background: "#FBFEFC",
 };
 
@@ -3228,10 +3228,10 @@ const emptyIcon: CSSProperties = {
 const successBox: CSSProperties = {
   marginBottom: 9,
   padding: "8px 11px",
-  border: "1px solid #B6DCC8",
+  border: "1px solid #B8D3EA",
   borderRadius: 7,
   background: LIGHT_GREEN,
-  color: "#146D45",
+  color: "#0D5598",
   fontSize: 13,
   fontWeight: 800,
 };
@@ -3239,10 +3239,10 @@ const successBox: CSSProperties = {
 const errorBox: CSSProperties = {
   marginBottom: 9,
   padding: "8px 11px",
-  border: "1px solid #E0AAAA",
+  border: "1px solid #B8D3EA",
   borderRadius: 7,
-  background: "#FFF4F4",
-  color: "#A11A1A",
+  background: "#F5F9FE",
+  color: "#0D4F91",
   fontSize: 13,
 };
 
@@ -3319,7 +3319,7 @@ const footerButton: CSSProperties = {
 
 const footerGreenButton: CSSProperties = {
   ...footerButton,
-  borderColor: "#B9DDCA",
+  borderColor: "#BDD7ED",
   background: LIGHT_GREEN,
   color: GREEN,
 };
