@@ -794,8 +794,8 @@ export default function XReportPage() {
             body {
               font-family: Arial, sans-serif;
               color: #111;
-              margin: 28px;
-              font-size: 12px;
+              margin: 0;
+              font-size: 10px;
             }
             h1 {
               margin: 0 0 4px;
@@ -830,11 +830,14 @@ export default function XReportPage() {
             table {
               width: 100%;
               border-collapse: collapse;
+              table-layout: fixed;
             }
             th, td {
               border-bottom: 1px solid #ddd;
-              padding: 6px 5px;
+              padding: 5px 3px;
               text-align: left;
+              font-size: 8px;
+              overflow-wrap: anywhere;
             }
             th {
               background: #f3f3f3;
@@ -978,7 +981,7 @@ export default function XReportPage() {
     openHtmlDocumentPreview(
       `X Report - ${selectedReportDay.business_date}`,
       html,
-      "landscape"
+      "portrait"
     );
   }
 
