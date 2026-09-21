@@ -1303,21 +1303,21 @@ function StatusBadge({
   let borderColor = "#ddd";
 
   if (status === "confirmed") {
-    background = "#E8F3FC";
-    color = "#0D5FA8";
-    borderColor = "#B8D3EA";
+    background = "#1268B3";
+    color = "#FFFFFF";
+    borderColor = "#0B4F8A";
   }
 
   if (status === "checked_in") {
-    background = "#EAF4FF";
-    color = "#0D5598";
-    borderColor = "#B8D3EA";
+    background = "#087F5B";
+    color = "#FFFFFF";
+    borderColor = "#066346";
   }
 
   if (status === "provisional") {
-    background = "#F1F5F8";
-    color = "#5E7385";
-    borderColor = "#CEDAE3";
+    background = "#F2B705";
+    color = "#342700";
+    borderColor = "#C99200";
   }
 
   if (
@@ -2050,7 +2050,8 @@ const bookingCell: React.CSSProperties = {
 
 const bookingGuest: React.CSSProperties = {
   display: "block",
-  fontSize: 7.5,
+  fontSize: 8,
+  fontWeight: 900,
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
@@ -2060,29 +2061,35 @@ const bookingNumber: React.CSSProperties = {
   display: "block",
   fontSize: 5.5,
   marginTop: 2,
-  opacity: 0.75,
+  opacity: 0.9,
 };
 
 const continuationMark: React.CSSProperties = {
-  opacity: 0.22,
+  opacity: 0.72,
+  color: "inherit",
+  fontSize: 11,
+  fontWeight: 900,
 };
 
 const confirmedCell: React.CSSProperties = {
-  background: "#E8F3FC",
-  color: "#0D5FA8",
-  borderColor: "#B8D3EA",
+  background: "#1268B3",
+  color: "#FFFFFF",
+  borderColor: "#0B4F8A",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,.22)",
 };
 
 const checkedInCell: React.CSSProperties = {
-  background: "#EAF4FF",
-  color: "#0D5598",
-  borderColor: "#B8D3EA",
+  background: "#087F5B",
+  color: "#FFFFFF",
+  borderColor: "#066346",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,.22)",
 };
 
 const provisionalCell: React.CSSProperties = {
-  background: "#F1F5F8",
-  color: "#5E7385",
-  borderColor: "#CEDAE3",
+  background: "#F2B705",
+  color: "#342700",
+  borderColor: "#C99200",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,.3)",
 };
 
 const availableLegend: React.CSSProperties = {
