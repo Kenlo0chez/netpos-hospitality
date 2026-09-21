@@ -970,6 +970,13 @@ export default function NewReservationPage() {
 
   return (
     <main style={pageStyle}>
+      <div style={reservationWizardOverlay}>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="New reservation wizard"
+          style={reservationWizardDialog}
+        >
       <div style={pageHeader}>
         <div>
           <div style={eyebrow}>
@@ -1144,7 +1151,7 @@ export default function NewReservationPage() {
           )}
 
           <WizardButtons
-            nextLabel="Choose Room →"
+            nextLabel="Proceed →"
             onNext={nextStep}
           />
         </section>
@@ -1733,6 +1740,8 @@ export default function NewReservationPage() {
           </div>
         </section>
       )}
+        </div>
+      </div>
 
       {showGuestModal && (
         <div style={modalOverlay}>
@@ -2281,10 +2290,34 @@ function createReservationNumber() {
 ========================================================= */
 
 const pageStyle: React.CSSProperties = {
-  maxWidth: 1050,
-  margin: "0 auto",
-  padding: "24px 28px 50px",
-  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif', color: "#17324D", background: "#F4F8FC", minHeight: "100vh",
+  minHeight: "calc(100vh - 116px)",
+  fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
+  color: "#17324D",
+  background:
+    "linear-gradient(135deg,#EAF4FF 0%,#F8FBFF 48%,#EDF6FF 100%)",
+};
+
+const reservationWizardOverlay: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 1200,
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  padding: 18,
+  background: "rgba(8,47,95,.38)",
+  backdropFilter: "blur(3px)",
+};
+
+const reservationWizardDialog: React.CSSProperties = {
+  width: "min(1040px, calc(100vw - 36px))",
+  maxHeight: "calc(100vh - 36px)",
+  overflowY: "auto",
+  padding: "18px 20px 20px",
+  border: "1px solid #B8D3EA",
+  borderRadius: 16,
+  background: "#F5F9FE",
+  boxShadow: "0 26px 80px rgba(8,47,95,.30)",
 };
 
 const pageHeader: React.CSSProperties = {
@@ -2292,7 +2325,7 @@ const pageHeader: React.CSSProperties = {
   justifyContent: "space-between",
   alignItems: "center",
   gap: 20,
-  marginBottom: 18,
+  marginBottom: 12,
 };
 
 const eyebrow: React.CSSProperties = {
@@ -2344,7 +2377,7 @@ const stepCounter: React.CSSProperties = {
 const progressBar: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
-  marginBottom: 18,
+  marginBottom: 12,
   padding: "10px 16px",
   borderWidth: 1,
   borderStyle: "solid",
@@ -2421,7 +2454,7 @@ const wizardCard: React.CSSProperties = {
   borderColor: "#ddd",
   borderRadius: 12,
   background: "white",
-  padding: 18,
+  padding: 16,
 };
 
 const stepHeading: React.CSSProperties = {
@@ -2676,7 +2709,7 @@ const wizardButtons: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  marginTop: 24,
+  marginTop: 16,
 };
 
 const backButton: React.CSSProperties = {
