@@ -1742,8 +1742,8 @@ function PropertyPerformanceTable({
                     <strong
                       style={{
                         display: "block",
-                        fontSize: 11.5,
-                        marginBottom: 1,
+                        fontSize: 13,
+                        marginBottom: 3,
                         whiteSpace: "nowrap",
                       }}
                     >
@@ -1754,7 +1754,7 @@ function PropertyPerformanceTable({
                       style={{
                         display: "block",
                         color: MUTED,
-                        fontSize: 10,
+                        fontSize: 11.5,
                         whiteSpace: "nowrap",
                       }}
                     >
@@ -2629,10 +2629,10 @@ const MUTED = "#71869A";
 // =========================================================
 
 const pageStyle: CSSProperties = {
-  minHeight: "calc(100vh - 116px)",
-  maxWidth: 1800,
+  minHeight: "calc(100vh - 100px)",
+  maxWidth: 1500,
   margin: "0 auto",
-  padding: "9px 18px 7px",
+  padding: "12px 22px 10px",
   fontFamily: 'Inter, "Segoe UI", Arial, sans-serif',
   color: TEXT,
   background:
@@ -2645,20 +2645,20 @@ const pageHeadingRow: CSSProperties = {
   justifyContent: "space-between",
   alignItems: "flex-end",
   gap: 18,
-  marginBottom: 6,
+  marginBottom: 9,
 };
 
 const eyebrowStyle: CSSProperties = {
-  marginBottom: 2,
+  marginBottom: 4,
   color: GREEN,
-  fontSize: 10,
+  fontSize: 11.5,
   fontWeight: 900,
   letterSpacing: 0.9,
 };
 
 const titleStyle: CSSProperties = {
   margin: 0,
-  fontSize: 24,
+  fontSize: 28,
   lineHeight: 1,
   color: DARK_BLUE,
   fontWeight: 900,
@@ -2666,8 +2666,8 @@ const titleStyle: CSSProperties = {
 
 const subtitleStyle: CSSProperties = {
   color: MUTED,
-  fontSize: 11.5,
-  marginTop: 3,
+  fontSize: 13,
+  marginTop: 5,
 };
 
 const frontDeskActions: CSSProperties = {
@@ -2730,13 +2730,13 @@ const secondaryTopButton: CSSProperties = {
 const summaryGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(7,minmax(0,1fr))",
-  gap: 6,
-  marginBottom: 6,
+  gap: 7,
+  marginBottom: 8,
 };
 
 const summaryCard: CSSProperties = {
-  minHeight: 55,
-  padding: "7px 10px",
+  minHeight: 67,
+  padding: "9px 11px",
   borderWidth: 1,
   borderStyle: "solid",
   borderRadius: 9,
@@ -2770,7 +2770,7 @@ const summaryOutstanding: CSSProperties = {
 
 const summaryLabel: CSSProperties = {
   color: "#5F778C",
-  fontSize: 10,
+  fontSize: 11.5,
   fontWeight: 900,
   textTransform: "uppercase",
   marginBottom: 3,
@@ -2779,24 +2779,24 @@ const summaryLabel: CSSProperties = {
 
 const summaryDescription: CSSProperties = {
   color: "#8A99A7",
-  fontSize: 10.5,
+  fontSize: 11.5,
 };
 
 const summaryValue: CSSProperties = {
-  fontSize: 24,
+  fontSize: 29,
   lineHeight: 1,
   color: DARK_BLUE,
 };
 
 const summaryMoney: CSSProperties = {
-  fontSize: 16,
+  fontSize: 18,
   lineHeight: 1,
   color: DARK_BLUE,
   whiteSpace: "nowrap",
 };
 
 const propertyPerformancePanel: CSSProperties = {
-  marginBottom: 6,
+  marginBottom: 9,
   border: "1px solid #CFE0ED",
   borderRadius: 10,
   background: "#FFFFFF",
@@ -2805,8 +2805,8 @@ const propertyPerformancePanel: CSSProperties = {
 };
 
 const propertyPerformanceHeader: CSSProperties = {
-  minHeight: 32,
-  padding: "5px 10px",
+  minHeight: 38,
+  padding: "7px 11px",
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
@@ -2823,14 +2823,14 @@ const propertyPerformanceTitle: CSSProperties = {
 };
 
 const propertyPerformanceSubtitle: CSSProperties = {
-  marginTop: 1,
+  marginTop: 2,
   color: MUTED,
-  fontSize: 10.5,
+  fontSize: 12,
 };
 
 const propertyPerformanceHint: CSSProperties = {
   color: BLUE,
-  fontSize: 10.5,
+  fontSize: 12,
   fontWeight: 800,
 };
 
@@ -2847,11 +2847,11 @@ const propertyPerformanceTable: CSSProperties = {
 };
 
 const propertyPerformanceTh: CSSProperties = {
-  padding: "6px 9px",
+  padding: "9px 12px",
   borderBottom: "1px solid #E8EEF3",
   background: "#F8FBFD",
   color: "#60778B",
-  fontSize: 10,
+  fontSize: 11.5,
   fontWeight: 900,
   textAlign: "center",
   whiteSpace: "nowrap",
@@ -2872,18 +2872,18 @@ const propertyPerformanceRow: CSSProperties = {
 const propertyPerformanceName: CSSProperties = {
   width: 250,
   minWidth: 250,
-  padding: "6px 10px",
+  padding: "10px 12px",
   color: TEXT,
-  fontSize: 11.5,
-  lineHeight: 1.2,
+  fontSize: 13,
+  lineHeight: 1.35,
   textAlign: "left",
 };
 
 const propertyPerformanceTd: CSSProperties = {
   minWidth: 88,
-  padding: "6px 9px",
+  padding: "10px 12px",
   color: TEXT,
-  fontSize: 11.5,
+  fontSize: 13,
   textAlign: "center",
   whiteSpace: "nowrap",
 };
@@ -2896,17 +2896,20 @@ const propertyPerformanceMoney: CSSProperties = {
 
 const dashboardGrid: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(3,minmax(0,1fr))",
-  gap: 6,
+  gridTemplateColumns:
+    "minmax(0,1.58fr) minmax(365px,.82fr)",
+  gap: 7,
   alignItems: "start",
 };
 
 const leftColumn: CSSProperties = {
-  display: "contents",
+  display: "grid",
+  gap: 7,
 };
 
 const rightColumn: CSSProperties = {
-  display: "contents",
+  display: "grid",
+  gap: 7,
 };
 
 const panelStyle: CSSProperties = {
@@ -2922,7 +2925,7 @@ const panelHeader: CSSProperties = {
   justifyContent: "space-between",
   alignItems: "center",
   gap: 10,
-  padding: "6px 9px",
+  padding: "9px 11px",
   borderBottom: "1px solid #E4ECF2",
   borderLeft: "4px solid",
   background:
@@ -2936,19 +2939,19 @@ const panelHeadingRow: CSSProperties = {
 };
 
 const panelTitle: CSSProperties = {
-  fontSize: 11.5,
+  fontSize: 13,
   color: DARK_BLUE,
 };
 
 const panelSubtitle: CSSProperties = {
   color: MUTED,
-  fontSize: 10,
-  marginTop: 1,
+  fontSize: 11.5,
+  marginTop: 2,
 };
 
 const countBadge: CSSProperties = {
-  minWidth: 18,
-  height: 18,
+  minWidth: 20,
+  height: 20,
   padding: "0 6px",
   borderRadius: 20,
   background: LIGHT_BLUE,
@@ -2956,7 +2959,7 @@ const countBadge: CSSProperties = {
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
-  fontSize: 10.5,
+  fontSize: 12,
   fontWeight: 900,
 };
 
@@ -2973,18 +2976,18 @@ const smallHeaderButton: CSSProperties = {
 
 const guestRow: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "minmax(0,1fr) 78px",
+  gridTemplateColumns: "minmax(0,1fr) 96px",
   borderBottom: "1px solid #EAF0F5",
 };
 
 const guestDetailsButton: CSSProperties = {
   border: 0,
   background: "#FFFFFF",
-  padding: "6px 9px",
+  padding: "9px 11px",
   textAlign: "left",
   display: "grid",
-  gridTemplateColumns: "1fr 2.2fr",
-  gap: 9,
+  gridTemplateColumns: "1.15fr 2.85fr",
+  gap: 15,
   alignItems: "center",
   cursor: "pointer",
 };
@@ -3012,13 +3015,13 @@ const reservationNumber: CSSProperties = {
 const guestInfoGroup: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(4,minmax(0,1fr))",
-  gap: 6,
+  gap: 10,
 };
 
 const infoLabel: CSSProperties = {
   display: "block",
   color: "#8293A2",
-  fontSize: 9,
+  fontSize: 13,
   fontWeight: 900,
   textTransform: "uppercase",
   marginBottom: 2,
@@ -3026,7 +3029,7 @@ const infoLabel: CSSProperties = {
 
 const infoValue: CSSProperties = {
   display: "block",
-  fontSize: 10.5,
+  fontSize: 13,
   color: TEXT,
   whiteSpace: "nowrap",
 };
@@ -3201,9 +3204,9 @@ const housekeepingFooter: CSSProperties = {
 };
 
 const emptyRow: CSSProperties = {
-  padding: "9px 10px",
+  padding: "13px 11px",
   color: MUTED,
-  fontSize: 11,
+  fontSize: 13,
   display: "flex",
   alignItems: "center",
   gap: 8,
@@ -3254,8 +3257,8 @@ const loadingBox: CSSProperties = {
 };
 
 const footerStyle: CSSProperties = {
-  marginTop: 6,
-  padding: "5px 8px",
+  marginTop: 10,
+  padding: "8px 10px",
   border: "1px solid #D2E0EA",
   borderRadius: 9,
   background: "#FFFFFF",
@@ -3269,7 +3272,7 @@ const footerStyle: CSSProperties = {
 const workflowStrip: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 5,
+  gap: 7,
 };
 
 const workflowStep: CSSProperties = {
@@ -3277,19 +3280,19 @@ const workflowStep: CSSProperties = {
   alignItems: "center",
   gap: 5,
   color: "#60778B",
-  fontSize: 10,
+  fontSize: 11.5,
 };
 
 const workflowNumber: CSSProperties = {
-  width: 16,
-  height: 16,
+  width: 19,
+  height: 19,
   borderRadius: "50%",
   background: LIGHT_BLUE,
   color: BLUE,
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  fontSize: 9.5,
+  fontSize: 11.5,
   fontWeight: 900,
 };
 
@@ -3308,8 +3311,8 @@ const footerButton: CSSProperties = {
   borderRadius: 6,
   background: "#FFFFFF",
   color: BLUE,
-  padding: "5px 8px",
-  fontSize: 10.5,
+  padding: "7px 10px",
+  fontSize: 12,
   fontWeight: 900,
   cursor: "pointer",
 };

@@ -358,7 +358,13 @@ export default function NetposAccessGuard({
         </>
       )}
 
-      {children}
+      {staff && !isPublic ? (
+        <div style={applicationShell}>
+          {children}
+        </div>
+      ) : (
+        children
+      )}
     </>
   );
 }
@@ -458,6 +464,9 @@ const errorCard: CSSProperties = {
 };
 
 const brandBar: CSSProperties = {
+  width: "100%",
+  maxWidth: 1360,
+  margin: "0 auto",
   minHeight: 58,
   padding: "8px 24px",
   display: "flex",
@@ -572,11 +581,20 @@ const mainNav: CSSProperties = {
 
 const menuInner: CSSProperties = {
   width: "100%",
+  maxWidth: 1360,
+  margin: "0 auto",
   display: "flex",
   alignItems: "center",
   gap: 4,
   padding: "7px 24px",
   overflowX: "auto",
+  boxSizing: "border-box",
+};
+
+const applicationShell: CSSProperties = {
+  width: "100%",
+  maxWidth: 1360,
+  margin: "0 auto",
   boxSizing: "border-box",
 };
 
