@@ -175,23 +175,34 @@ export default function FinancePage() {
     openPrintPreview({ title: `${propertyName} - ${reportTitle}`, body, orientation: "landscape" });
   }
 
+  const activeSection = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
+
   return <main style={page}><section style={shell}>
-    <header style={header}><div><div style={eyebrow}>FINANCE CONTROL</div><h1 style={title}>Cashbook & Reconciliation</h1>
-      <p style={subtitle}>Pastel-style batch capture with controlled processing.</p></div>
+    <header style={header}><div><div style={eyebrow}>FINANCE CONTROL</div><h1 style={title}>{activeSection.label}</h1>
+      <p style={subtitle}>{activeSection.hint}</p></div>
       <div style={headerControls}><select value={propertyId} onChange={(e) => changeProperty(e.target.value)} style={propertySelect} aria-label="Property">
         {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
         <button style={previewButton} onClick={previewFinanceReport}>PDF Preview</button></div>
     </header>
 
-    <div style={summaryGrid}><Metric label="Income" value={money(totals.income)} tone="green" />
-      <Metric label="Expenses & Payouts" value={money(totals.expenses)} tone="red" />
-      <Metric label="Net Cashbook" value={money(totals.balance)} tone={totals.balance >= 0 ? "blue" : "red"} />
-      <Metric label="VAT Payable" value={money(totals.vatDue)} tone="silver" /></div>
-    <nav style={tabBar} aria-label="Finance sections">{tabs.map((tab) => <button key={tab.id} onClick={() => selectFinanceSection(tab.id)}
-      style={{ ...tabButton, ...(activeTab === tab.id ? activeTabButton : {}) }}><strong>{tab.label}</strong><span>{tab.hint}</span></button>)}</nav>
-    {error && <div style={errorBox}>{error}</div>}{message && <div style={successBox}>{message}</div>}
+    <div style={financeWorkspace}>
+      <nav style={financeSidebar} aria-label="Finance sections">
+        <div style={financeSidebarHeading}>Finance Navigation</div>
+        {tabs.map((tab) => <button key={tab.id} onClick={() => selectFinanceSection(tab.id)}
+          aria-current={activeTab === tab.id ? "page" : undefined}
+          style={{ ...tabButton, ...(activeTab === tab.id ? activeTabButton : {}) }}>
+          <strong>{tab.label}</strong><span>{tab.hint}</span>
+        </button>)}
+      </nav>
 
-    {activeTab === "cashbook" && <>
+      <div style={financePageContent}>
+        <div style={summaryGrid}><Metric label="Income" value={money(totals.income)} tone="green" />
+          <Metric label="Expenses & Payouts" value={money(totals.expenses)} tone="red" />
+          <Metric label="Net Cashbook" value={money(totals.balance)} tone={totals.balance >= 0 ? "blue" : "red"} />
+          <Metric label="VAT Payable" value={money(totals.vatDue)} tone="silver" /></div>
+        {error && <div style={errorBox}>{error}</div>}{message && <div style={successBox}>{message}</div>}
+
+        {activeTab === "cashbook" && <>
       <section style={panel}><div style={batchHeader}><div><div style={batchNumberStyle}>BATCH {batchNumber}</div>
         <h2 style={panelTitle}>Cashbook Batch Entry</h2><p style={panelText}>Capture several transactions, save the draft, then process the completed batch.</p></div>
         <div style={batchActions}><button style={secondaryButton} onClick={() => setBatchRows((rows) => [...rows, createRow()])}>+ Add Row</button>
@@ -219,14 +230,16 @@ export default function FinancePage() {
       <HistoryPanel title="Posted Cashbook Entries" description="Processed transactions for this property." entries={entries} loading={loading} />
     </>}
 
-    {activeTab === "vat" && <section style={panel}><div style={panelHeading}><div><h2 style={panelTitle}>VAT Summary</h2><p style={panelText}>Based on processed cashbook entries.</p></div></div>
+        {activeTab === "vat" && <section style={panel}><div style={panelHeading}><div><h2 style={panelTitle}>VAT Summary</h2><p style={panelText}>Based on processed cashbook entries.</p></div></div>
       <div style={vatGrid}><Metric label="Output VAT collected" value={money(totals.outputVat)} tone="blue" /><Metric label="Input VAT paid" value={money(totals.inputVat)} tone="green" />
         <Metric label="VAT payable / (credit)" value={money(totals.vatDue)} tone={totals.vatDue >= 0 ? "red" : "green"} /></div>
       <p style={note}>Management summary only. Confirm tax periods and supporting invoices before filing a VAT return.</p></section>}
 
-    {(activeTab === "reconciliation" || activeTab === "payouts") && <HistoryPanel title={activeTab === "reconciliation" ? "Bank Reconciliation" : "Payouts"}
+        {(activeTab === "reconciliation" || activeTab === "payouts") && <HistoryPanel title={activeTab === "reconciliation" ? "Bank Reconciliation" : "Payouts"}
       description={activeTab === "reconciliation" ? "Review entries and link them to the bank statement." : "Processed cash payouts for this property."}
       entries={filtered} loading={loading} reconciliation={activeTab === "reconciliation"} onBankStatus={setBankStatus} />}
+      </div>
+    </div>
   </section></main>;
 }
 
@@ -254,7 +267,12 @@ const eyebrow:CSSProperties={fontSize:10,fontWeight:900,letterSpacing:1.5,color:
 const propertySelect:CSSProperties={height:40,minWidth:250,border:"1px solid #B8C7D5",borderRadius:9,padding:"0 12px",background:"white",fontWeight:800,color:"#21384D"};
 const headerControls:CSSProperties={display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}; const previewButton:CSSProperties={height:40,border:"1px solid #16729B",borderRadius:9,padding:"0 14px",background:"#EAF5FA",color:"#155B7A",fontWeight:850,cursor:"pointer"};
 const summaryGrid:CSSProperties={display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,marginBottom:12}; const metricCard:CSSProperties={padding:"11px 14px",border:"1px solid rgba(70,94,117,.13)",borderRadius:11,display:"flex",flexDirection:"column",gap:4}; const metricLabel:CSSProperties={fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:.6,color:"#667085"}; const metricValue:CSSProperties={fontSize:19};
-const tabBar:CSSProperties={display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,background:"rgba(255,255,255,.7)",padding:6,borderRadius:12,border:"1px solid #DCE5ED",marginBottom:12}; const tabButton:CSSProperties={border:0,borderRadius:8,padding:"8px 11px",background:"transparent",color:"#56697B",cursor:"pointer",display:"flex",flexDirection:"column",gap:2,textAlign:"left"}; const activeTabButton:CSSProperties={background:"#173E5C",color:"white",boxShadow:"0 5px 15px rgba(23,62,92,.18)"};
+const financeWorkspace:CSSProperties={display:"grid",gridTemplateColumns:"220px minmax(0,1fr)",gap:12,alignItems:"start"};
+const financeSidebar:CSSProperties={position:"sticky",top:78,display:"flex",flexDirection:"column",gap:6,padding:8,border:"1px solid #D4E2EC",borderRadius:12,background:"#FFFFFF",boxShadow:"0 5px 18px rgba(13,79,145,.07)"};
+const financeSidebarHeading:CSSProperties={padding:"8px 10px 5px",color:"#678097",fontSize:9,fontWeight:900,textTransform:"uppercase",letterSpacing:.8};
+const financePageContent:CSSProperties={minWidth:0};
+const tabButton:CSSProperties={width:"100%",minHeight:58,border:"1px solid #E0EAF1",borderRadius:8,padding:"9px 11px",background:"#F8FBFE",color:"#38566F",cursor:"pointer",display:"flex",flexDirection:"column",justifyContent:"center",gap:3,textAlign:"left",fontFamily:"inherit"};
+const activeTabButton:CSSProperties={background:"linear-gradient(135deg,#123F69 0%,#0B5FA5 100%)",borderColor:"#0B5FA5",color:"white",boxShadow:"0 5px 15px rgba(13,79,145,.20)"};
 const panel:CSSProperties={background:"rgba(255,255,255,.96)",border:"1px solid #DCE5ED",borderRadius:12,boxShadow:"0 8px 24px rgba(24,54,78,.07)",overflow:"hidden"}; const panelHeading:CSSProperties={padding:"13px 15px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #E6ECF2"}; const panelTitle:CSSProperties={margin:0,fontSize:17,color:"#173E5C"}; const panelText:CSSProperties={margin:"3px 0 0",fontSize:12,color:"#667085"}; const countBadge:CSSProperties={fontSize:11,fontWeight:800,background:"#EDF4FA",color:"#276C91",padding:"5px 8px",borderRadius:99};
 const batchHeader:CSSProperties={...panelHeading,alignItems:"flex-end",gap:15,flexWrap:"wrap"}; const batchNumberStyle:CSSProperties={fontSize:9,fontWeight:900,color:"#28759B",letterSpacing:1}; const batchActions:CSSProperties={display:"flex",gap:7,flexWrap:"wrap"};
 const buttonBase:CSSProperties={height:35,borderRadius:7,padding:"0 12px",fontSize:11,fontWeight:850,cursor:"pointer"}; const secondaryButton:CSSProperties={...buttonBase,border:"1px solid #B8C7D5",background:"#F5F8FA",color:"#28465F"}; const clearButton:CSSProperties={...buttonBase,border:"1px solid #B8D3EA",background:"#F5F9FE",color:"#0D4F91"}; const processButton:CSSProperties={...buttonBase,border:0,background:"linear-gradient(135deg,#0B4E8A,#1268B3)",color:"white",padding:"0 17px"};
