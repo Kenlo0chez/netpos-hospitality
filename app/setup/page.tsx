@@ -512,6 +512,14 @@ export default function SetupPage() {
           >
             Users & Permissions
           </button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/properties")}
+            style={secondaryButton}
+          >
+            Banking & Documents
+          </button>
         </div>
       </section>
 

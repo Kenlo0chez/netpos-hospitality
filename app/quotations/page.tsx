@@ -18,6 +18,12 @@ type Property = {
   vat_number: string | null;
   vat_rate: number | null;
   town: string | null;
+  bank_name: string | null;
+  bank_account_name: string | null;
+  bank_account_number: string | null;
+  bank_branch_code: string | null;
+  payment_reference_instruction: string | null;
+  invoice_terms: string | null;
 };
 
 type Guest = {
@@ -111,6 +117,7 @@ export default function QuotationsPage() {
   const [search, setSearch] = useState("");
 
   const [showForm, setShowForm] = useState(false);
+  const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -239,7 +246,13 @@ export default function QuotationsPage() {
           email,
           vat_number,
           vat_rate,
-          town
+          town,
+          bank_name,
+          bank_account_name,
+          bank_account_number,
+          bank_branch_code,
+          payment_reference_instruction,
+          invoice_terms
         `)
         .order("name"),
       supabase
@@ -400,12 +413,32 @@ export default function QuotationsPage() {
     setDiscountAmount(0);
     setValidUntil(addDays(today(), 7));
     setNotes("");
+    setEditingQuoteId(null);
 
     if (roomTypes[0]) {
       setRoomTypeId(roomTypes[0].id);
       setNightlyRate(Number(roomTypes[0].base_rate ?? 0));
     }
 
+    setShowForm(true);
+  }
+
+  function openEditQuote(quote: Quotation) {
+    setMessage("");
+    setError("");
+    setEditingQuoteId(quote.id);
+    setGuestId(quote.guest_id);
+    setCompanyId(quote.company_id ?? "");
+    setRoomTypeId(quote.room_type_id);
+    setRoomId(quote.room_id ?? "");
+    setArrivalDate(quote.arrival_date);
+    setDepartureDate(quote.departure_date);
+    setAdults(quote.adults);
+    setChildren(quote.children);
+    setNightlyRate(Number(quote.nightly_rate));
+    setDiscountAmount(Number(quote.discount_amount));
+    setValidUntil(quote.valid_until);
+    setNotes(quote.notes ?? "");
     setShowForm(true);
   }
 
@@ -460,9 +493,7 @@ export default function QuotationsPage() {
 
     setSaving(true);
 
-    const { data, error: insertError } = await supabase
-      .from("quotations")
-      .insert({
+    const quotePayload = {
         property_id: propertyId,
         guest_id: guestId,
         company_id: companyId || null,
@@ -479,9 +510,19 @@ export default function QuotationsPage() {
         vat_amount: vatAmount,
         total_amount: subtotal,
         valid_until: validUntil,
-        status: "draft",
         notes: notes.trim() || null,
-      })
+      };
+
+    const saveRequest = editingQuoteId
+      ? supabase
+          .from("quotations")
+          .update(quotePayload)
+          .eq("id", editingQuoteId)
+      : supabase
+          .from("quotations")
+          .insert({ ...quotePayload, status: "draft" });
+
+    const { data, error: insertError } = await saveRequest
       .select(`
         id,
         quotation_number,
@@ -517,7 +558,10 @@ export default function QuotationsPage() {
 
     const createdQuote = data as Quotation;
     setShowForm(false);
-    setMessage(`Quotation ${createdQuote.quotation_number} created.`);
+    setMessage(
+      `Quotation ${createdQuote.quotation_number} ${editingQuoteId ? "updated" : "created"}.`
+    );
+    setEditingQuoteId(null);
     printQuote(createdQuote, previewWindow);
     await loadQuotes(propertyId);
   }
@@ -678,14 +722,17 @@ export default function QuotationsPage() {
         </style>
       </head>
       <body>
-        <div class="header">
+        <div class="document-header">
           <div>
-            <h1>NETPOS HOSPITALITY</h1>
-            <div>${escapeHtml(property?.name ?? "")}</div>
+            <div class="property-name">${escapeHtml(property?.name ?? "Netpos Hospitality")}</div>
+            ${property?.town ? `<div>${escapeHtml(property.town)}</div>` : ""}
+            ${property?.phone ? `<div>Tel: ${escapeHtml(property.phone)}</div>` : ""}
+            ${property?.email ? `<div>Email: ${escapeHtml(property.email)}</div>` : ""}
+            ${property?.vat_number ? `<div>VAT No: ${escapeHtml(property.vat_number)}</div>` : ""}
           </div>
-          <div style="text-align:right">
-            <h2>QUOTATION</h2>
-            <div>${escapeHtml(quote.quotation_number)}</div>
+          <div class="document-title">
+            <h1>QUOTATION</h1>
+            <strong>${escapeHtml(quote.quotation_number)}</strong>
           </div>
         </div>
 
@@ -794,6 +841,22 @@ export default function QuotationsPage() {
             : ""
         }
 
+        ${
+          property?.bank_name || property?.bank_account_number
+            ? `<div class="bank">
+                <strong>BANKING DETAILS</strong>
+                ${property?.bank_name ? `<div>${escapeHtml(property.bank_name)}</div>` : ""}
+                ${property?.bank_account_name ? `<div>Account Name: ${escapeHtml(property.bank_account_name)}</div>` : ""}
+                ${property?.bank_account_number ? `<div>Account Number: ${escapeHtml(property.bank_account_number)}</div>` : ""}
+                ${property?.bank_branch_code ? `<div>Branch Code: ${escapeHtml(property.bank_branch_code)}</div>` : ""}
+                <div style="margin-top:6px">${escapeHtml(
+                  property?.payment_reference_instruction ??
+                    `Please use ${quote.quotation_number} as payment reference.`
+                )}</div>
+              </div>`
+            : ""
+        }
+
         <div class="footer">
           <strong>${escapeHtml(property?.name ?? "")}</strong><br/>
           ${escapeHtml(property?.town ?? "")}
@@ -815,6 +878,7 @@ export default function QuotationsPage() {
           <br/><br/>
           This quotation is valid until ${formatDate(quote.valid_until)}
           and remains subject to room availability until a reservation is confirmed.
+          ${property?.invoice_terms ? `<br/>${escapeHtml(property.invoice_terms)}` : ""}
         </div>
 
         <script>
@@ -1042,6 +1106,16 @@ export default function QuotationsPage() {
                   </div>
 
                   <div style={actionsCell}>
+                    {quote.status !== "converted" && (
+                      <button
+                        type="button"
+                        onClick={() => openEditQuote(quote)}
+                        style={smallButton}
+                      >
+                        Edit
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => printQuote(quote)}
@@ -1101,7 +1175,7 @@ export default function QuotationsPage() {
             <div style={modalHeader}>
               <div>
                 <h3 style={modalTitle}>
-                  New Quotation
+                  {editingQuoteId ? "Edit Quotation" : "New Quotation"}
                 </h3>
                 <div style={smallMuted}>
                   Create an accommodation quote
@@ -1110,7 +1184,10 @@ export default function QuotationsPage() {
 
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingQuoteId(null);
+                }}
                 style={closeButton}
               >
                 ×
@@ -1411,8 +1488,12 @@ export default function QuotationsPage() {
                 style={saveButton}
               >
                 {saving
-                  ? "Creating..."
-                  : "Create Quotation"}
+                  ? editingQuoteId
+                    ? "Saving..."
+                    : "Creating..."
+                  : editingQuoteId
+                    ? "Save Changes"
+                    : "Create Quotation"}
               </button>
             </div>
           </div>
