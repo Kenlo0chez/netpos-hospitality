@@ -1184,28 +1184,30 @@ export default function QuotationsPage() {
                 </select>
               </Field>
 
-              <Field label="Arrival">
-                <input
-                  type="date"
-                  value={arrivalDate}
-                  onChange={(event) =>
-                    setArrivalDate(event.target.value)
-                  }
-                  style={input}
-                />
-              </Field>
+              <div style={dateRangeField}>
+                <Field label="Arrival">
+                  <input
+                    type="date"
+                    value={arrivalDate}
+                    onChange={(event) =>
+                      setArrivalDate(event.target.value)
+                    }
+                    style={input}
+                  />
+                </Field>
 
-              <Field label="Departure">
-                <input
-                  type="date"
-                  value={departureDate}
-                  min={addDays(arrivalDate, 1)}
-                  onChange={(event) =>
-                    setDepartureDate(event.target.value)
-                  }
-                  style={input}
-                />
-              </Field>
+                <Field label="Departure">
+                  <input
+                    type="date"
+                    value={departureDate}
+                    min={addDays(arrivalDate, 1)}
+                    onChange={(event) =>
+                      setDepartureDate(event.target.value)
+                    }
+                    style={input}
+                  />
+                </Field>
+              </div>
 
               <Field label="Room Type">
                 <select
@@ -1386,6 +1388,12 @@ export default function QuotationsPage() {
                 </Field>
               </div>
             </div>
+
+            {error && (
+              <div style={modalErrorBox} role="alert">
+                {error}
+              </div>
+            )}
 
             <div style={modalFooter}>
               <button
@@ -1855,6 +1863,23 @@ const formGrid: CSSProperties = {
   gridTemplateColumns: "1fr 1fr 1fr",
   gap: 12,
   padding: 18,
+};
+
+const dateRangeField: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 8,
+};
+
+const modalErrorBox: CSSProperties = {
+  margin: "0 18px 12px",
+  padding: "9px 11px",
+  border: "1px solid #F0B8B8",
+  borderRadius: 7,
+  background: "#FFF4F4",
+  color: "#A8172B",
+  fontSize: 9,
+  fontWeight: 800,
 };
 
 const field: CSSProperties = {
