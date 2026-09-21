@@ -443,6 +443,21 @@ export default function QuotationsPage() {
       return;
     }
 
+    // Open immediately from the click event so browsers do not block the
+    // quotation preview while the database request is in progress.
+    const previewWindow = window.open(
+      "",
+      "_blank",
+      "width=1120,height=900"
+    );
+
+    if (previewWindow) {
+      previewWindow.document.write(
+        "<!doctype html><title>Creating quotation...</title><body style='font-family:Arial,sans-serif;padding:40px;color:#123a59'>Preparing your quotation...</body>"
+      );
+      previewWindow.document.close();
+    }
+
     setSaving(true);
 
     const { data, error: insertError } = await supabase
@@ -495,12 +510,15 @@ export default function QuotationsPage() {
     setSaving(false);
 
     if (insertError) {
+      previewWindow?.close();
       setError(insertError.message);
       return;
     }
 
+    const createdQuote = data as Quotation;
     setShowForm(false);
-    setMessage(`Quotation ${data.quotation_number} created.`);
+    setMessage(`Quotation ${createdQuote.quotation_number} created.`);
+    printQuote(createdQuote, previewWindow);
     await loadQuotes(propertyId);
   }
 
@@ -557,7 +575,10 @@ export default function QuotationsPage() {
     router.push(`/quotations/${quote.id}/convert`);
   }
 
-  function printQuote(quote: Quotation) {
+  function printQuote(
+    quote: Quotation,
+    targetWindow?: Window | null
+  ) {
     const property = properties.find(
       (x) => x.id === quote.property_id
     );
@@ -807,7 +828,9 @@ export default function QuotationsPage() {
 
     openHtmlDocumentPreview(
       `${quote.quotation_number} - Quotation`,
-      html
+      html,
+      "portrait",
+      targetWindow
     );
   }
 
@@ -1927,4 +1950,3 @@ const saveButton: CSSProperties = {
   fontWeight: 900,
   cursor: "pointer",
 };
-

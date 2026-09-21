@@ -5,6 +5,7 @@ type PreviewOptions = {
   body: string;
   orientation?: PrintOrientation;
   extraStyles?: string;
+  targetWindow?: Window | null;
 };
 
 export function openPrintPreview({
@@ -12,8 +13,10 @@ export function openPrintPreview({
   body,
   orientation = "portrait",
   extraStyles = "",
+  targetWindow,
 }: PreviewOptions) {
-  const preview = window.open("", "_blank", "width=1120,height=900");
+  const preview =
+    targetWindow ?? window.open("", "_blank", "width=1120,height=900");
 
   if (!preview) {
     window.alert("Please allow pop-ups so the document preview can open.");
@@ -30,7 +33,8 @@ export function openPrintPreview({
 export function openHtmlDocumentPreview(
   title: string,
   html: string,
-  orientation: PrintOrientation = "portrait"
+  orientation: PrintOrientation = "portrait",
+  targetWindow?: Window | null
 ) {
   const parsed = new DOMParser().parseFromString(html, "text/html");
   parsed.querySelectorAll("script").forEach((script) => script.remove());
@@ -44,6 +48,7 @@ export function openHtmlDocumentPreview(
     body: parsed.body.innerHTML,
     orientation,
     extraStyles: styles,
+    targetWindow,
   });
 }
 
