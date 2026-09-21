@@ -1084,7 +1084,7 @@ export default function NewReservationPage() {
           <div
             style={{
               ...twoColumns,
-              marginTop: 16,
+              marginTop: 9,
             }}
           >
             <Field label="Check-in">
@@ -1319,7 +1319,7 @@ export default function NewReservationPage() {
           <div
             style={{
               ...twoColumns,
-              marginTop: 16,
+              marginTop: 9,
             }}
           >
             <Field label="Adults">
@@ -1366,7 +1366,7 @@ export default function NewReservationPage() {
           </div>
 
           {roomId && (
-            <div style={{ marginTop: 16 }}>
+            <div style={{ marginTop: 8 }}>
               {availability === "checking" && (
                 <div style={checkingStyle}>
                   Checking room availability...
@@ -2313,7 +2313,7 @@ const reservationWizardDialog: React.CSSProperties = {
   width: "min(1040px, calc(100vw - 36px))",
   maxHeight: "calc(100vh - 36px)",
   overflowY: "auto",
-  padding: "18px 20px 20px",
+  padding: "12px 16px 14px",
   border: "1px solid #B8D3EA",
   borderRadius: 16,
   background: "#F5F9FE",
@@ -2325,7 +2325,7 @@ const pageHeader: React.CSSProperties = {
   justifyContent: "space-between",
   alignItems: "center",
   gap: 20,
-  marginBottom: 12,
+  marginBottom: 7,
 };
 
 const eyebrow: React.CSSProperties = {
@@ -2338,13 +2338,13 @@ const eyebrow: React.CSSProperties = {
 
 const pageTitle: React.CSSProperties = {
   margin: 0,
-  fontSize: 27,
+  fontSize: 24,
 };
 
 const pageSubtitle: React.CSSProperties = {
   color: "#666",
   fontSize: 11,
-  marginTop: 5,
+  marginTop: 2,
 };
 
 const headerRight: React.CSSProperties = {
@@ -2377,8 +2377,8 @@ const stepCounter: React.CSSProperties = {
 const progressBar: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
-  marginBottom: 12,
-  padding: "10px 16px",
+  marginBottom: 8,
+  padding: "7px 13px",
   borderWidth: 1,
   borderStyle: "solid",
   borderColor: "#ddd",
@@ -2454,19 +2454,19 @@ const wizardCard: React.CSSProperties = {
   borderColor: "#ddd",
   borderRadius: 12,
   background: "white",
-  padding: 16,
+  padding: 12,
 };
 
 const stepHeading: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 11,
-  marginBottom: 12,
+  gap: 9,
+  marginBottom: 7,
 };
 
 const stepNumber: React.CSSProperties = {
-  width: 32,
-  height: 32,
+  width: 28,
+  height: 28,
   borderRadius: "50%",
   background: "#111",
   color: "white",
@@ -2506,12 +2506,16 @@ const calendarPrefillNotice: React.CSSProperties = {
 
 const calendarRoomCard: React.CSSProperties = {
   position: "relative",
+  display: "grid",
+  gridTemplateColumns: "auto minmax(0,1fr) auto",
+  alignItems: "center",
+  gap: 14,
   borderWidth: 2,
   borderStyle: "solid",
   borderColor: "#173f73",
   background: "#eef5ff",
   borderRadius: 10,
-  padding: "16px",
+  padding: "9px 11px",
 };
 
 const calendarRoomBadge: React.CSSProperties = {
@@ -2521,20 +2525,22 @@ const calendarRoomBadge: React.CSSProperties = {
   fontSize: 7,
   fontWeight: 800,
   borderRadius: 20,
-  padding: "5px 8px",
-  marginBottom: 12,
+  padding: "4px 7px",
+  marginBottom: 0,
+  whiteSpace: "nowrap",
 };
 
 const calendarRoomMain: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1.3fr 1fr 1fr",
-  gap: 16,
+  gap: 10,
+  alignItems: "center",
 };
 
 const calendarRoomNumber: React.CSSProperties = {
   display: "block",
   color: "#173f73",
-  fontSize: 20,
+  fontSize: 17,
 };
 
 const calendarRoomName: React.CSSProperties = {
@@ -2544,17 +2550,18 @@ const calendarRoomName: React.CSSProperties = {
 };
 
 const changeRoomButton: React.CSSProperties = {
-  marginTop: 14,
+  marginTop: 0,
   borderWidth: 1,
   borderStyle: "solid",
   borderColor: "#173f73",
   background: "white",
   color: "#173f73",
   borderRadius: 7,
-  padding: "7px 10px",
+  padding: "5px 9px",
   fontSize: 9,
   fontWeight: 800,
   cursor: "pointer",
+  whiteSpace: "nowrap",
 };
 
 const twoColumns: React.CSSProperties = {
@@ -2584,7 +2591,7 @@ const inputStyle: React.CSSProperties = {
   borderColor: "#ccc",
   borderRadius: 8,
   background: "white",
-  padding: "10px 11px",
+  padding: "8px 10px",
   fontSize: 12,
   outline: "none",
 };
@@ -2629,9 +2636,9 @@ const stayStrip: React.CSSProperties = {
   alignItems: "center",
   gap: 9,
   background: "#f6f8fb",
-  padding: "9px 11px",
+  padding: "7px 10px",
   borderRadius: 8,
-  marginBottom: 18,
+  marginBottom: 8,
   fontSize: 10,
 };
 
@@ -2664,7 +2671,7 @@ const checkingStyle: React.CSSProperties = {
 const availableStyle: React.CSSProperties = {
   background: "#eff9f2",
   color: "#0D5598",
-  padding: 11,
+  padding: 7,
   borderRadius: 8,
   fontSize: 10,
   borderWidth: 1,
@@ -2675,7 +2682,7 @@ const availableStyle: React.CSSProperties = {
 const unavailableStyle: React.CSSProperties = {
   background: "#F5F9FE",
   color: "#0D4F91",
-  padding: 11,
+  padding: 7,
   borderRadius: 8,
   fontSize: 10,
   borderWidth: 1,
@@ -2692,10 +2699,10 @@ const pricePreview: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr 1fr",
   gap: 10,
-  marginTop: 16,
+  marginTop: 8,
   background: "#fafafa",
   borderRadius: 9,
-  padding: 13,
+  padding: 8,
   borderWidth: 1,
   borderStyle: "solid",
   borderColor: "#e2e2e2",
@@ -2709,7 +2716,7 @@ const wizardButtons: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  marginTop: 16,
+  marginTop: 10,
 };
 
 const backButton: React.CSSProperties = {

@@ -1581,12 +1581,12 @@ export default function ReservationDetailsPage() {
       !reservation ||
       !reservationRoom
     ) {
-      return;
+      return false;
     }
 
     if (invoice) {
       openInvoicePDF();
-      return;
+      return true;
     }
 
     setGeneratingInvoice(true);
@@ -1786,14 +1786,27 @@ export default function ReservationDetailsPage() {
           createdItem,
         ]
       );
+
+      return true;
     } catch (error) {
       alert(
         error instanceof Error
           ? error.message
           : "Could not generate invoice."
       );
+
+      return false;
     } finally {
       setGeneratingInvoice(false);
+    }
+  }
+
+  async function finishReservation() {
+    const invoiceReady =
+      await generateInvoice();
+
+    if (invoiceReady) {
+      router.push("/reservations");
     }
   }
 
@@ -2733,7 +2746,7 @@ export default function ReservationDetailsPage() {
 
             <button
               type="button"
-              onClick={generateInvoice}
+              onClick={finishReservation}
               disabled={generatingInvoice}
               style={finishButton}
             >
