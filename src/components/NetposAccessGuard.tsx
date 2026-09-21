@@ -77,11 +77,6 @@ const MENU_ITEMS: MenuItem[] = [
     roles: ["owner", "manager", "housekeeping"],
   },
   {
-    label: "Reports",
-    href: "/reports",
-    roles: ["owner", "manager"],
-  },
-  {
     label: "Finance",
     href: "/finance",
     roles: ["owner", "manager"],
@@ -114,6 +109,7 @@ export default function NetposAccessGuard({
   const [checking, setChecking] = useState(true);
   const [staff, setStaff] = useState<StaffSession | null>(null);
   const [accessError, setAccessError] = useState("");
+  const [financeMenuOpen, setFinanceMenuOpen] = useState(false);
 
   const isPublic = useMemo(
     () =>
@@ -325,12 +321,80 @@ export default function NetposAccessGuard({
                   item.roles.includes(staff.role)
                 )
                 .map((item) => {
-                  const active =
+                  const active = item.href === "/finance"
+                    ? pathname === "/finance" ||
+                      pathname.startsWith("/finance/") ||
+                      pathname === "/reports" ||
+                      pathname.startsWith("/reports/")
+                    :
                     pathname === item.href ||
                     pathname.startsWith(`${item.href}/`);
 
                   const isEod =
                     item.href === "/cash-up";
+
+                  if (item.href === "/finance") {
+                    return (
+                      <div
+                        key={item.href}
+                        style={financeMenu}
+                        onMouseEnter={() => setFinanceMenuOpen(true)}
+                        onMouseLeave={() => setFinanceMenuOpen(false)}
+                      >
+                        <button
+                          type="button"
+                          aria-haspopup="menu"
+                          aria-expanded={financeMenuOpen}
+                          onClick={() =>
+                            setFinanceMenuOpen((open) => !open)
+                          }
+                          style={{
+                            ...menuLink,
+                            ...financeMenuButton,
+                            ...(active ? activeMenuLink : {}),
+                          }}
+                        >
+                          Finance <span aria-hidden="true">▾</span>
+                        </button>
+
+                        {financeMenuOpen && (
+                          <div role="menu" style={financeDropdown}>
+                            <Link
+                              href="/finance"
+                              role="menuitem"
+                              onClick={() => setFinanceMenuOpen(false)}
+                              style={{
+                                ...financeDropdownLink,
+                                ...(pathname === "/finance" ||
+                                pathname.startsWith("/finance/")
+                                  ? financeDropdownLinkActive
+                                  : {}),
+                              }}
+                            >
+                              <strong>Finance Overview</strong>
+                              <span>Cashbook, VAT and reconciliation</span>
+                            </Link>
+
+                            <Link
+                              href="/reports"
+                              role="menuitem"
+                              onClick={() => setFinanceMenuOpen(false)}
+                              style={{
+                                ...financeDropdownLink,
+                                ...(pathname === "/reports" ||
+                                pathname.startsWith("/reports/")
+                                  ? financeDropdownLinkActive
+                                  : {}),
+                              }}
+                            >
+                              <strong>Reports</strong>
+                              <span>Management and operational reports</span>
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
 
                   return (
                     <Link
@@ -587,7 +651,7 @@ const menuInner: CSSProperties = {
   alignItems: "center",
   gap: 4,
   padding: "7px 24px",
-  overflowX: "auto",
+  overflow: "visible",
   boxSizing: "border-box",
 };
 
@@ -615,6 +679,52 @@ const activeMenuLink: CSSProperties = {
   color: "#0D4F91",
   borderColor: "#FFFFFF",
   boxShadow: "0 2px 7px rgba(0,0,0,.10)",
+};
+
+const financeMenu: CSSProperties = {
+  position: "relative",
+  flex: "0 0 auto",
+};
+
+const financeMenuButton: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  background: "transparent",
+};
+
+const financeDropdown: CSSProperties = {
+  position: "absolute",
+  top: "calc(100% + 7px)",
+  left: 0,
+  zIndex: 1005,
+  width: 270,
+  padding: 7,
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  border: "1px solid #C7DCEB",
+  borderRadius: 10,
+  background: "#FFFFFF",
+  boxShadow: "0 14px 34px rgba(8,58,107,.20)",
+};
+
+const financeDropdownLink: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 3,
+  padding: "10px 12px",
+  borderRadius: 7,
+  color: "#123F69",
+  textDecoration: "none",
+  fontSize: 12,
+};
+
+const financeDropdownLinkActive: CSSProperties = {
+  background: "#EAF4FF",
+  color: "#0D4F91",
 };
 
 const eodMenuLink: CSSProperties = {
