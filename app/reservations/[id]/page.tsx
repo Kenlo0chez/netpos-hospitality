@@ -2663,12 +2663,13 @@ export default function ReservationDetailsPage() {
 
             <button
               type="button"
-              onClick={
-                openConfirmationPDF
-              }
+              onClick={generateInvoice}
+              disabled={generatingInvoice}
               style={secondaryButton}
             >
-              Confirmation PDF
+              {generatingInvoice
+                ? "Preparing Invoice..."
+                : "Invoice PDF"}
             </button>
 
             {canConfirm && (
@@ -2732,16 +2733,13 @@ export default function ReservationDetailsPage() {
 
             <button
               type="button"
-              onClick={() => {
-                router.push(
-                  "/reservations"
-                );
-
-                router.refresh();
-              }}
+              onClick={generateInvoice}
+              disabled={generatingInvoice}
               style={finishButton}
             >
-              ✓ Finish
+              {generatingInvoice
+                ? "Preparing Invoice..."
+                : "✓ Finish"}
             </button>
           </div>
         </header>
