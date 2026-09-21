@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -106,6 +107,27 @@ export default function NetposAccessGuard({
   const [accessError, setAccessError] = useState("");
   const [financeMenuOpen, setFinanceMenuOpen] = useState(false);
   const [setupMenuOpen, setSetupMenuOpen] = useState(false);
+  const menuCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function keepMenuOpen(openMenu: () => void) {
+    if (menuCloseTimer.current) {
+      clearTimeout(menuCloseTimer.current);
+      menuCloseTimer.current = null;
+    }
+
+    openMenu();
+  }
+
+  function closeMenuShortly(closeMenu: () => void) {
+    if (menuCloseTimer.current) {
+      clearTimeout(menuCloseTimer.current);
+    }
+
+    menuCloseTimer.current = setTimeout(() => {
+      closeMenu();
+      menuCloseTimer.current = null;
+    }, 220);
+  }
 
   const isPublic = useMemo(
     () =>
@@ -339,8 +361,15 @@ export default function NetposAccessGuard({
                       <div
                         key={item.href}
                         style={financeMenu}
-                        onMouseEnter={() => setFinanceMenuOpen(true)}
-                        onMouseLeave={() => setFinanceMenuOpen(false)}
+                        onMouseEnter={() =>
+                          keepMenuOpen(() => {
+                            setSetupMenuOpen(false);
+                            setFinanceMenuOpen(true);
+                          })
+                        }
+                        onMouseLeave={() =>
+                          closeMenuShortly(() => setFinanceMenuOpen(false))
+                        }
                       >
                         <button
                           type="button"
@@ -441,8 +470,15 @@ export default function NetposAccessGuard({
                       <div
                         key={item.href}
                         style={financeMenu}
-                        onMouseEnter={() => setSetupMenuOpen(true)}
-                        onMouseLeave={() => setSetupMenuOpen(false)}
+                        onMouseEnter={() =>
+                          keepMenuOpen(() => {
+                            setFinanceMenuOpen(false);
+                            setSetupMenuOpen(true);
+                          })
+                        }
+                        onMouseLeave={() =>
+                          closeMenuShortly(() => setSetupMenuOpen(false))
+                        }
                       >
                         <button
                           type="button"
@@ -800,7 +836,7 @@ const financeMenuButton: CSSProperties = {
 
 const financeDropdown: CSSProperties = {
   position: "absolute",
-  top: "calc(100% + 7px)",
+  top: "100%",
   left: 0,
   zIndex: 1005,
   width: 320,
