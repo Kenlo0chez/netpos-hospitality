@@ -1160,6 +1160,7 @@ export default function FrontDeskPage() {
             totalOutstanding
           }
           description="Guest balances"
+          tone="outstanding"
         />
 
         <SummaryMoneyCard
@@ -1168,6 +1169,7 @@ export default function FrontDeskPage() {
             revenueToday
           }
           description="Payments received"
+          tone="revenue"
         />
       </section>
 
@@ -2356,29 +2358,32 @@ function SummaryMoneyCard({
   label,
   value,
   description,
+  tone,
 }: {
   label: string;
   value: number;
   description: string;
+  tone: "outstanding" | "revenue";
 }) {
   return (
     <div
       style={{
         ...summaryCard,
-        ...summaryOutstanding,
+        ...summaryMoneyCard,
+        ...(tone === "revenue"
+          ? summaryRevenue
+          : summaryOutstanding),
       }}
     >
       <div>
         <div
-          style={summaryLabel}
+          style={summaryMoneyLabel}
         >
           {label}
         </div>
 
         <div
-          style={
-            summaryDescription
-          }
+          style={summaryMoneyDescription}
         >
           {description}
         </div>
@@ -2764,8 +2769,23 @@ const summaryWarning: CSSProperties = {
 };
 
 const summaryOutstanding: CSSProperties = {
-  borderColor: "#C7DDEC",
-  background: LIGHT_BLUE,
+  borderColor: "#0A477E",
+  background:
+    "linear-gradient(135deg,#123F69 0%,#0B4E8A 100%)",
+  boxShadow: "0 6px 16px rgba(8,58,107,.20)",
+};
+
+const summaryRevenue: CSSProperties = {
+  borderColor: "#0D68B3",
+  background:
+    "linear-gradient(135deg,#0D6DB8 0%,#1680CF 100%)",
+  boxShadow: "0 6px 16px rgba(13,109,184,.24)",
+};
+
+const summaryMoneyCard: CSSProperties = {
+  flexDirection: "column",
+  alignItems: "stretch",
+  justifyContent: "space-between",
 };
 
 const summaryLabel: CSSProperties = {
@@ -2789,10 +2809,27 @@ const summaryValue: CSSProperties = {
 };
 
 const summaryMoney: CSSProperties = {
-  fontSize: 18,
+  fontSize: 21,
   lineHeight: 1,
-  color: DARK_BLUE,
+  color: "#FFFFFF",
+  textAlign: "right",
   whiteSpace: "nowrap",
+  letterSpacing: -0.35,
+  textShadow: "0 1px 2px rgba(0,0,0,.12)",
+};
+
+const summaryMoneyLabel: CSSProperties = {
+  color: "#FFFFFF",
+  fontSize: 11.5,
+  fontWeight: 900,
+  textTransform: "uppercase",
+  marginBottom: 2,
+  letterSpacing: 0.4,
+};
+
+const summaryMoneyDescription: CSSProperties = {
+  color: "rgba(255,255,255,.78)",
+  fontSize: 10.5,
 };
 
 const propertyPerformancePanel: CSSProperties = {
