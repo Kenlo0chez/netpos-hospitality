@@ -5,7 +5,7 @@ import { supabase } from "@/src/lib/supabase";
 import { scopeProperties } from "@/src/lib/propertyAccess";
 import { openPrintPreview } from "@/src/lib/printPreview";
 
-type Tab = "cashbook" | "reconciliation" | "vat" | "payouts";
+type Tab = "cashbook" | "reconciliation" | "vat" | "payouts" | "income-statement";
 type EntryType = "income" | "expense" | "payout";
 type Property = { id: string; name: string; vat_rate: number };
 type FinanceEntry = {
@@ -18,12 +18,18 @@ type BatchRow = {
   id: string; entry_date: string; entry_type: EntryType; reference: string;
   description: string; category: string; payment_method: string; amount: string; vat_amount: string;
 };
+type Invoice = {
+  id: string; property_id: string; invoice_number: string; invoice_date: string;
+  status: "draft" | "issued" | "part_paid" | "paid" | "void";
+  total_amount: number; vat_amount: number;
+};
 
 const tabs: { id: Tab; label: string; hint: string }[] = [
   { id: "cashbook", label: "Cashbook", hint: "Batch processing" },
   { id: "reconciliation", label: "Bank Reconciliation", hint: "Match bank activity" },
   { id: "vat", label: "VAT Report", hint: "VAT collected and paid" },
   { id: "payouts", label: "Payouts", hint: "Cash paid out" },
+  { id: "income-statement", label: "Income Statement", hint: "Revenue, expenses and profit" },
 ];
 
 function createRow(): BatchRow {
@@ -37,6 +43,9 @@ export default function FinancePage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyId, setPropertyId] = useState("");
   const [entries, setEntries] = useState<FinanceEntry[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [statementStart, setStatementStart] = useState(() => monthStart());
+  const [statementEnd, setStatementEnd] = useState(today);
   const [batchRows, setBatchRows] = useState<BatchRow[]>(createRows);
   const [batchNumber] = useState(() => `CB-${today().replaceAll("-", "")}-${String(Date.now()).slice(-4)}`);
   const [loading, setLoading] = useState(true);
@@ -67,11 +76,18 @@ export default function FinancePage() {
   const loadEntries = useCallback(async (selectedProperty: string) => {
     if (!selectedProperty) return;
     setLoading(true); setError("");
-    const { data, error: queryError } = await supabase.from("finance_entries")
-      .select("id,property_id,entry_date,entry_type,category,description,payment_method,reference,amount,vat_amount,bank_status,bank_reference")
-      .eq("property_id", selectedProperty).order("entry_date", { ascending: false }).order("created_at", { ascending: false });
-    if (queryError) setError(queryError.message);
-    setEntries((data as FinanceEntry[]) ?? []); setLoading(false);
+    const [entryResult, invoiceResult] = await Promise.all([
+      supabase.from("finance_entries")
+        .select("id,property_id,entry_date,entry_type,category,description,payment_method,reference,amount,vat_amount,bank_status,bank_reference")
+        .eq("property_id", selectedProperty).order("entry_date", { ascending: false }).order("created_at", { ascending: false }),
+      supabase.from("invoices")
+        .select("id,property_id,invoice_number,invoice_date,status,total_amount,vat_amount")
+        .eq("property_id", selectedProperty).neq("status", "void").neq("status", "draft")
+        .order("invoice_date", { ascending: false }),
+    ]);
+    if (entryResult.error || invoiceResult.error) setError(entryResult.error?.message ?? invoiceResult.error?.message ?? "Unable to load finance data.");
+    setEntries((entryResult.data as FinanceEntry[]) ?? []);
+    setInvoices((invoiceResult.data as Invoice[]) ?? []); setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -103,6 +119,25 @@ export default function FinancePage() {
       credit: total.credit + (row.entry_type === "income" ? amount : 0),
       vat: total.vat + (Number(row.vat_amount) || 0) };
   }, { debit: 0, credit: 0, vat: 0 }), [batchRows]);
+  const statement = useMemo(() => {
+    const periodEntries = entries.filter((entry) => entry.entry_date >= statementStart && entry.entry_date <= statementEnd);
+    const periodInvoices = invoices.filter((invoice) => invoice.invoice_date >= statementStart && invoice.invoice_date <= statementEnd);
+    const accommodationRevenue = periodInvoices.reduce((sum, invoice) => sum + Math.max(0, Number(invoice.total_amount) - Number(invoice.vat_amount)), 0);
+    const otherIncome = periodEntries.filter((entry) => entry.entry_type === "income")
+      .reduce((sum, entry) => sum + Math.max(0, Number(entry.amount) - Number(entry.vat_amount)), 0);
+    const expenseGroups = periodEntries.filter((entry) => entry.entry_type !== "income").reduce<Record<string, number>>((groups, entry) => {
+      const category = entry.category.trim() || "Uncategorised";
+      groups[category] = (groups[category] ?? 0) + Math.max(0, Number(entry.amount) - Number(entry.vat_amount));
+      return groups;
+    }, {});
+    const expenses = Object.values(expenseGroups).reduce((sum, amount) => sum + amount, 0);
+    const revenue = accommodationRevenue + otherIncome;
+    const profit = revenue - expenses;
+    return { accommodationRevenue, otherIncome, revenue, expenses, profit,
+      margin: revenue > 0 ? (profit / revenue) * 100 : 0,
+      expenseGroups: Object.entries(expenseGroups).sort((a, b) => b[1] - a[1]),
+      invoiceCount: periodInvoices.length, entryCount: periodEntries.length };
+  }, [entries, invoices, statementStart, statementEnd]);
 
   function restoreDraft(selectedProperty: string) {
     if (!selectedProperty) { setBatchRows(createRows()); return; }
@@ -165,7 +200,17 @@ export default function FinancePage() {
   function previewFinanceReport() {
     const propertyName = properties.find((property) => property.id === propertyId)?.name ?? "Property";
     const reportTitle = activeTab === "vat" ? "VAT REPORT" : activeTab === "payouts" ? "PAYOUTS REPORT"
-      : activeTab === "reconciliation" ? "BANK RECONCILIATION" : "CASHBOOK REPORT";
+      : activeTab === "reconciliation" ? "BANK RECONCILIATION" : activeTab === "income-statement" ? "MANAGEMENT INCOME STATEMENT" : "CASHBOOK REPORT";
+    if (activeTab === "income-statement") {
+      const expenseRows = statement.expenseGroups.map(([category, amount]) => documentRow(category, money(amount))).join("");
+      const body = `<div class="document-header"><div><div class="property-name">${escapeHtml(propertyName)}</div><div>NETPOS HOSPITALITY</div></div><div class="document-title"><h1>${reportTitle}</h1><div>${displayDate(statementStart)} to ${displayDate(statementEnd)}</div></div></div>
+        <div class="section"><div class="section-title">Revenue</div>${documentRow("Accommodation revenue", money(statement.accommodationRevenue))}${documentRow("Other income", money(statement.otherIncome))}${documentRow("Total revenue", money(statement.revenue), true)}</div>
+        <div class="section"><div class="section-title">Operating expenses</div>${expenseRows || documentRow("No expenses recorded", money(0))}${documentRow("Total operating expenses", money(statement.expenses), true)}</div>
+        <div class="section">${documentRow("Net profit / (loss)", money(statement.profit), true)}${documentRow("Operating margin", `${statement.margin.toFixed(1)}%`)}</div>
+        <div class="footer">Management accounts · Amounts exclude VAT · Generated by Netpos Hospitality · ${escapeHtml(propertyName)}</div>`;
+      openPrintPreview({ title: `${propertyName} - ${reportTitle}`, body, orientation: "portrait" });
+      return;
+    }
     const reportEntries = activeTab === "payouts" ? filtered : entries;
     const rows = reportEntries.map((entry) => `<tr><td>${displayDate(entry.entry_date)}</td><td>${entry.entry_type.toUpperCase()}</td><td>${escapeHtml(entry.description)}<br/><small>${escapeHtml(entry.category)}</small></td><td>${escapeHtml(entry.reference ?? "-")}</td><td>${entry.payment_method.toUpperCase()}</td><td class="right">${money(entry.vat_amount)}</td><td class="right">${entry.entry_type === "income" ? "+" : "-"}${money(entry.amount)}</td></tr>`).join("");
     const body = `<div class="document-header"><div><div class="property-name">${escapeHtml(propertyName)}</div><div>NETPOS HOSPITALITY</div></div><div class="document-title"><h1>${reportTitle}</h1><div>Printed ${new Date().toLocaleString("en-NA")}</div></div></div>
@@ -238,9 +283,33 @@ export default function FinancePage() {
         {(activeTab === "reconciliation" || activeTab === "payouts") && <HistoryPanel title={activeTab === "reconciliation" ? "Bank Reconciliation" : "Payouts"}
       description={activeTab === "reconciliation" ? "Review entries and link them to the bank statement." : "Processed cash payouts for this property."}
       entries={filtered} loading={loading} reconciliation={activeTab === "reconciliation"} onBankStatus={setBankStatus} />}
+
+        {activeTab === "income-statement" && <section style={panel}>
+          <div style={statementHeader}><div><h2 style={panelTitle}>Management Income Statement</h2>
+            <p style={panelText}>Operational performance based on posted invoices and processed cashbook entries. Amounts exclude VAT.</p></div>
+            <div style={dateControls}><label style={dateLabel}>From<input type="date" value={statementStart} max={statementEnd} onChange={(event) => setStatementStart(event.target.value)} style={dateInput} /></label>
+              <label style={dateLabel}>To<input type="date" value={statementEnd} min={statementStart} onChange={(event) => setStatementEnd(event.target.value)} style={dateInput} /></label></div></div>
+          <div style={statementMetrics}><Metric label="Total Revenue" value={money(statement.revenue)} tone="blue" />
+            <Metric label="Operating Expenses" value={money(statement.expenses)} tone="red" />
+            <Metric label="Net Profit / (Loss)" value={money(statement.profit)} tone={statement.profit >= 0 ? "green" : "red"} />
+            <Metric label="Operating Margin" value={`${statement.margin.toFixed(1)}%`} tone="silver" /></div>
+          <div style={statementColumns}><div style={statementBlock}><h3 style={statementBlockTitle}>Revenue</h3>
+            <StatementRow label="Accommodation revenue" detail={`${statement.invoiceCount} posted invoice${statement.invoiceCount === 1 ? "" : "s"}`} value={statement.accommodationRevenue} />
+            <StatementRow label="Other income" detail="Processed cashbook income" value={statement.otherIncome} />
+            <StatementRow label="Total revenue" value={statement.revenue} total /></div>
+            <div style={statementBlock}><h3 style={statementBlockTitle}>Operating Expenses</h3>
+              {statement.expenseGroups.length === 0 ? <div style={statementEmpty}>No processed expenses in this period.</div> : statement.expenseGroups.map(([category, amount]) => <StatementRow key={category} label={category} value={amount} />)}
+              <StatementRow label="Total operating expenses" detail={`${statement.entryCount} cashbook entries reviewed`} value={statement.expenses} total /></div></div>
+          <div style={profitRow}><div><span style={profitLabel}>NET PROFIT / (LOSS)</span><div style={profitHint}>Revenue less operating expenses</div></div><strong style={{ ...profitValue, color: statement.profit >= 0 ? "#0D5598" : "#B42318" }}>{money(statement.profit)}</strong></div>
+          <p style={note}>Management report only. Draft and void invoices are excluded. Configure formal accounting periods and adjustments before using this as a statutory financial statement.</p>
+        </section>}
       </div>
     </div>
   </section></main>;
+}
+
+function StatementRow({ label, detail, value, total = false }:{ label:string; detail?:string; value:number; total?:boolean }) {
+  return <div style={{ ...statementRow, ...(total ? statementTotalRow : {}) }}><div><strong>{label}</strong>{detail && <div style={muted}>{detail}</div>}</div><strong>{money(value)}</strong></div>;
 }
 
 function HistoryPanel({ title, description, entries, loading, reconciliation = false, onBankStatus }:{ title:string; description:string; entries:FinanceEntry[]; loading:boolean; reconciliation?:boolean; onBankStatus?:(entry:FinanceEntry,status:FinanceEntry["bank_status"])=>void }) {
@@ -256,6 +325,7 @@ function HistoryPanel({ title, description, entries, loading, reconciliation = f
 function Metric({label,value,tone}:{label:string;value:string;tone:"green"|"red"|"blue"|"silver"}) { const colors={green:["#EAF4FF","#0D5598"],red:["#EAF4FF","#0D5598"],blue:["#EAF3FF","#175CD3"],silver:["#F1F4F7","#344054"]}; return <div style={{...metricCard,background:colors[tone][0]}}><span style={metricLabel}>{label}</span><strong style={{...metricValue,color:colors[tone][1]}}>{value}</strong></div>; }
 function money(value:number) { return new Intl.NumberFormat("en-NA",{style:"currency",currency:"NAD",minimumFractionDigits:2}).format(Number(value)||0).replace("NAD","N$"); }
 function today() { return new Date().toISOString().slice(0,10); }
+function monthStart() { const date = new Date(); return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2,"0")}-01`; }
 function displayDate(value:string) { return new Date(`${value}T00:00:00`).toLocaleDateString("en-NA",{day:"2-digit",month:"short",year:"numeric"}); }
 function typeBadge(type:EntryType):CSSProperties { return {...badge,background:type === "income" ? "#EAF4FF" : type === "payout" ? "#EEF6FF" : "#EAF4FF",color:type === "income" ? "#0D5598" : type === "payout" ? "#0D5598" : "#0D5598"}; }
 function documentRow(label:string,value:string,large=false) { return `<div class="row${large ? " large" : ""}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`; }
@@ -281,3 +351,5 @@ const td:CSSProperties={padding:"9px 10px",borderBottom:"1px solid #EDF1F4",vert
 const batchFooter:CSSProperties={display:"flex",justifyContent:"space-between",alignItems:"center",gap:15,padding:"10px 14px",background:"#F5F8FA",borderTop:"1px solid #DCE5ED",fontSize:10,color:"#647789"}; const batchTotalsStyle:CSSProperties={display:"flex",gap:20,color:"#40566B",flexWrap:"wrap"};
 const muted:CSSProperties={fontSize:10,color:"#8492A0",marginTop:2}; const badge:CSSProperties={display:"inline-block",borderRadius:99,padding:"3px 6px",fontSize:9,fontWeight:900,textTransform:"uppercase"}; const miniSelect:CSSProperties={border:"1px solid #C9D5DF",borderRadius:6,padding:"5px",background:"white",fontSize:11}; const emptyCell:CSSProperties={...td,textAlign:"center",padding:35,color:"#7D8D9B"};
 const vatGrid:CSSProperties={display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:12,padding:16}; const note:CSSProperties={margin:"0 16px 16px",padding:11,borderRadius:8,background:"#F5F9FE",color:"#0D4F91",fontSize:11}; const errorBox:CSSProperties={padding:"9px 12px",marginBottom:10,borderRadius:8,background:"#EAF4FF",color:"#0D5598",fontSize:12,fontWeight:700}; const successBox:CSSProperties={padding:"9px 12px",marginBottom:10,borderRadius:8,background:"#EAF4FF",color:"#0D5598",fontSize:12,fontWeight:700};
+const statementHeader:CSSProperties={...panelHeading,alignItems:"flex-end",gap:16,flexWrap:"wrap"}; const dateControls:CSSProperties={display:"flex",gap:8,flexWrap:"wrap"}; const dateLabel:CSSProperties={display:"flex",flexDirection:"column",gap:3,fontSize:9,fontWeight:900,textTransform:"uppercase",color:"#60778C"}; const dateInput:CSSProperties={height:34,border:"1px solid #B8C7D5",borderRadius:7,padding:"0 8px",background:"white",color:"#173E5C",fontWeight:700};
+const statementMetrics:CSSProperties={display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10,padding:14}; const statementColumns:CSSProperties={display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:12,padding:"0 14px 14px"}; const statementBlock:CSSProperties={border:"1px solid #DCE5ED",borderRadius:10,overflow:"hidden"}; const statementBlockTitle:CSSProperties={margin:0,padding:"10px 12px",background:"#EAF3FB",color:"#144D7A",fontSize:14}; const statementRow:CSSProperties={display:"flex",justifyContent:"space-between",alignItems:"center",gap:15,padding:"10px 12px",borderTop:"1px solid #EDF1F4",fontSize:12,color:"#28465F"}; const statementTotalRow:CSSProperties={background:"#F5F9FD",borderTop:"2px solid #AFCBE2",color:"#123F69"}; const statementEmpty:CSSProperties={padding:22,textAlign:"center",color:"#7D8D9B",fontSize:12}; const profitRow:CSSProperties={margin:"0 14px 14px",padding:"14px 16px",borderRadius:10,background:"linear-gradient(135deg,#E7F2FC,#F5FAFF)",border:"1px solid #B9D4EA",display:"flex",justifyContent:"space-between",alignItems:"center",gap:15}; const profitLabel:CSSProperties={fontSize:12,fontWeight:900,letterSpacing:.6,color:"#123F69"}; const profitHint:CSSProperties={fontSize:10,color:"#6B8194",marginTop:2}; const profitValue:CSSProperties={fontSize:24};
