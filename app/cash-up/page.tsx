@@ -1011,26 +1011,20 @@ export default function XReportPage() {
 
     try {
       const {
-        error: closeError,
+        data: nextDay,
+        error: endOfDayError,
       } = await supabase
-        .from("trading_days")
-        .update({
-          status: "closed",
-          closed_at:
-            new Date().toISOString(),
+        .rpc("netpos_end_of_day", {
+          p_trading_day_id:
+            currentDay.id,
         })
-        .eq("id", currentDay.id);
+        .single();
 
-      if (closeError) {
+      if (endOfDayError) {
         throw new Error(
-          closeError.message
+          endOfDayError.message
         );
       }
-
-      const nextDay =
-        await createNextTradingDay(
-          propertyId
-        );
 
       setMessage(
         `End of Day completed. ${formatDate(
@@ -1038,8 +1032,12 @@ export default function XReportPage() {
         )} moved to History.`
       );
 
-      setCurrentDay(nextDay);
-      setSelectedReportDay(nextDay);
+      setCurrentDay(
+        nextDay as TradingDay
+      );
+      setSelectedReportDay(
+        nextDay as TradingDay
+      );
 
       await loadPropertyReport(
         propertyId
