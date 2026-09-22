@@ -126,6 +126,7 @@ export default function FinancePage() {
       credit: total.credit + (row.entry_type === "income" ? amount : 0),
       vat: total.vat + (Number(row.vat_amount) || 0) };
   }, { debit: 0, credit: 0, vat: 0 }), [batchRows]);
+  const hasActiveBatchRows = useMemo(() => batchRows.some((row) => row.description.trim() || row.reference.trim() || Number(row.amount) > 0), [batchRows]);
   const statement = useMemo(() => {
     const periodEntries = entries.filter((entry) => entry.entry_date >= statementStart && entry.entry_date <= statementEnd);
     const periodInvoices = invoices.filter((invoice) => invoice.invoice_date >= statementStart && invoice.invoice_date <= statementEnd);
@@ -146,22 +147,41 @@ export default function FinancePage() {
       invoiceCount: periodInvoices.length, entryCount: periodEntries.length };
   }, [entries, invoices, statementStart, statementEnd]);
 
+  useEffect(() => {
+    function protectUnsavedBatch(event: BeforeUnloadEvent) {
+      if (!hasActiveBatchRows || draftSaved) return;
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", protectUnsavedBatch);
+    return () => window.removeEventListener("beforeunload", protectUnsavedBatch);
+  }, [draftSaved, hasActiveBatchRows]);
+
   function restoreDraft(selectedProperty: string) {
-    if (!selectedProperty) { setBatchRows(createRows()); return; }
+    if (!selectedProperty) { setBatchRows(createRows()); setDraftSaved(false); return; }
     const saved = sessionStorage.getItem(`netpos_finance_batch_${selectedProperty}`);
-    try { setBatchRows(saved ? JSON.parse(saved) as BatchRow[] : createRows()); }
-    catch { setBatchRows(createRows()); }
+    try { setBatchRows(saved ? JSON.parse(saved) as BatchRow[] : createRows()); setDraftSaved(Boolean(saved)); }
+    catch { setBatchRows(createRows()); setDraftSaved(false); }
   }
   async function changeProperty(next: string) {
     setPropertyId(next); sessionStorage.setItem("netpos_property_id", next);
     restoreDraft(next); await loadEntries(next);
   }
   function updateRow(id: string, field: keyof BatchRow, value: string) {
-    setBatchRows((rows) => rows.map((row) => row.id === id ? { ...row, [field]: value } : row));
+    setBatchRows((rows) => rows.map((row) => {
+      if (row.id !== id) return row;
+      if (field === "entry_type") {
+        const category = value === "income" ? "Other Income" : value === "payout" ? "Owner Payout" : "Operating Expense";
+        return { ...row, entry_type: value as EntryType, category };
+      }
+      return { ...row, [field]: value };
+    }));
     setDraftSaved(false); setMessage(""); setError("");
   }
+  function addBatchRow() { setBatchRows((rows) => [...rows, createRow()]); setDraftSaved(false); }
   function removeRow(id: string) {
     setBatchRows((rows) => rows.length === 1 ? createRows() : rows.filter((row) => row.id !== id));
+    setDraftSaved(false);
   }
   function saveBatchDraft() {
     if (!propertyId) { setError("Select a property before saving the batch."); return; }
@@ -276,7 +296,7 @@ export default function FinancePage() {
         {activeTab === "cashbook" && <>
       <section style={panel}><div style={batchHeader}><div><div style={batchNumberStyle}>BATCH {batchNumber}</div>
         <h2 style={panelTitle}>Cashbook Batch Entry</h2><p style={panelText}>Capture several transactions, save the draft, then process the completed batch.</p></div>
-        <div style={batchActions}><button style={secondaryButton} onClick={() => setBatchRows((rows) => [...rows, createRow()])}>+ Add Row</button>
+        <div style={batchActions}><button style={secondaryButton} onClick={addBatchRow}>+ Add Row</button>
           <button style={secondaryButton} onClick={saveBatchDraft}>Save Batch</button>
           <button style={clearButton} onClick={clearBatch}>Clear</button>
           <button style={processButton} onClick={processBatch} disabled={processing}>{processing ? "Processing..." : "Process Batch"}</button></div></div>
