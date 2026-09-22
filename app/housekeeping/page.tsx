@@ -490,17 +490,22 @@ const summaryValue: CSSProperties = {
 
 const roomGrid: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))",
-  gap: 7,
+  gridTemplateColumns: "repeat(auto-fill,230px)",
+  gap: 12,
   alignContent: "start",
+  justifyContent: "start",
 };
 
 const roomCard: CSSProperties = {
-  minWidth: 0,
+  width: 230,
+  height: 230,
   background: "#fff",
   border: "1px solid #D5E2ED",
-  borderRadius: 8,
-  padding: "8px 9px",
+  borderRadius: 10,
+  padding: 14,
+  boxSizing: "border-box",
+  display: "flex",
+  flexDirection: "column",
 };
 
 const roomHeader: CSSProperties = {
@@ -511,21 +516,21 @@ const roomHeader: CSSProperties = {
 };
 
 const roomLabel: CSSProperties = {
-  fontSize: 7,
+  fontSize: 9,
   fontWeight: 800,
   color: "#7A8794",
 };
 
 const roomNumber: CSSProperties = {
-  fontSize: 19,
+  fontSize: 24,
   lineHeight: 1,
   fontWeight: 900,
   color: "#0D4F91",
 };
 
 const roomName: CSSProperties = {
-  marginTop: 2,
-  fontSize: 8,
+  marginTop: 4,
+  fontSize: 10,
   color: "#6F7D8C",
   whiteSpace: "nowrap",
   overflow: "hidden",
@@ -537,17 +542,17 @@ const buttonGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(3,1fr)",
   gap: 4,
-  marginTop: 7,
+  marginTop: "auto",
 };
 
 const button: CSSProperties = {
-  minHeight: 26,
-  padding: "4px 3px",
+  minHeight: 34,
+  padding: "6px 4px",
   background: "#fff",
   border: "1px solid #C7D6E3",
   borderRadius: 5,
   cursor: "pointer",
-  fontSize: 8,
+  fontSize: 9,
   lineHeight: 1,
 };
 
@@ -561,15 +566,15 @@ const primaryButton: CSSProperties = {
 
 const outButton: CSSProperties = {
   width: "100%",
-  minHeight: 24,
-  marginTop: 4,
-  padding: "4px",
+  minHeight: 32,
+  marginTop: 6,
+  padding: "6px",
   border: "1px solid #D5E2ED",
   borderRadius: 5,
   background: "#F5F7F9",
   color: "#566573",
   cursor: "pointer",
-  fontSize: 8,
+  fontSize: 9,
   lineHeight: 1,
 };
 
