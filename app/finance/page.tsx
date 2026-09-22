@@ -31,6 +31,12 @@ const tabs: { id: Tab; label: string; hint: string }[] = [
   { id: "payouts", label: "Payouts", hint: "Cash paid out" },
   { id: "income-statement", label: "Income Statement", hint: "Revenue, expenses and profit" },
 ];
+const accountCategories = [
+  "Accommodation Revenue", "Other Income", "Food & Beverage Revenue", "Laundry Revenue",
+  "Operating Expense", "Utilities", "Cleaning Supplies", "Guest Amenities", "Repairs & Maintenance",
+  "Salaries & Wages", "Transport", "Marketing", "Bank Charges", "Insurance", "Security",
+  "Office & Administration", "Owner Payout", "Petty Cash Payout",
+];
 
 function createRow(): BatchRow {
   return { id: crypto.randomUUID(), entry_date: today(), entry_type: "expense", reference: "",
@@ -223,6 +229,23 @@ export default function FinancePage() {
     openPrintPreview({ title: `${propertyName} - ${reportTitle}`, body, orientation: "landscape" });
   }
 
+  function exportIncomeStatement() {
+    const propertyName = properties.find((property) => property.id === propertyId)?.name ?? "Property";
+    const rows = [
+      ["Management Income Statement", propertyName], ["Period", `${statementStart} to ${statementEnd}`], [],
+      ["Revenue", "Amount (NAD)"], ["Accommodation revenue", statement.accommodationRevenue],
+      ["Other income", statement.otherIncome], ["Total revenue", statement.revenue], [],
+      ["Operating expenses", "Amount (NAD)"], ...statement.expenseGroups,
+      ["Total operating expenses", statement.expenses], [], ["Net profit / (loss)", statement.profit],
+      ["Operating margin", `${statement.margin.toFixed(1)}%`],
+    ];
+    const csv = rows.map((row) => row.map((cell) => csvCell(String(cell ?? ""))).join(",")).join("\r\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    link.download = `${propertyName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-income-statement-${statementStart}-${statementEnd}.csv`;
+    link.click(); URL.revokeObjectURL(link.href);
+  }
+
   const activeSection = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
 
   return <main style={page}><section style={shell}>
@@ -266,12 +289,12 @@ export default function FinancePage() {
           <td style={batchTd}><select value={row.entry_type} onChange={(e) => updateRow(row.id, "entry_type", e.target.value)} style={gridInput}><option value="income">Income</option><option value="expense">Expense</option><option value="payout">Payout</option></select></td>
           <td style={batchTd}><input value={row.reference} onChange={(e) => updateRow(row.id, "reference", e.target.value)} placeholder="Reference" style={gridInput} /></td>
           <td style={batchTd}><input value={row.description} onChange={(e) => updateRow(row.id, "description", e.target.value)} placeholder="Transaction description" style={gridInput} /></td>
-          <td style={batchTd}><input value={row.category} onChange={(e) => updateRow(row.id, "category", e.target.value)} placeholder="Account" style={gridInput} /></td>
+          <td style={batchTd}><input value={row.category} list="finance-account-categories" onChange={(e) => updateRow(row.id, "category", e.target.value)} placeholder="Select account" style={gridInput} /></td>
           <td style={batchTd}><select value={row.payment_method} onChange={(e) => updateRow(row.id, "payment_method", e.target.value)} style={gridInput}><option value="cash">Cash</option><option value="card">Card</option><option value="eft">EFT</option><option value="account">Account</option></select></td>
           <td style={batchTd}><input type="number" min="0.01" step="0.01" value={row.amount} onChange={(e) => updateRow(row.id, "amount", e.target.value)} placeholder="0.00" style={moneyInput} /></td>
           <td style={batchTd}><input type="number" min="0" step="0.01" value={row.vat_amount} onChange={(e) => updateRow(row.id, "vat_amount", e.target.value)} placeholder="0.00" style={moneyInput} /></td>
           <td style={batchTd}><button aria-label={`Remove row ${index + 1}`} onClick={() => removeRow(row.id)} style={removeButton}>×</button></td>
-        </tr>)}</tbody></table></div>
+        </tr>)}</tbody></table><datalist id="finance-account-categories">{accountCategories.map((category) => <option key={category} value={category} />)}</datalist></div>
         <div style={batchFooter}><span>{batchRows.length} capture rows</span><div style={batchTotalsStyle}><span>Debits <strong>{money(batchTotals.debit)}</strong></span>
           <span>Credits <strong>{money(batchTotals.credit)}</strong></span><span>VAT <strong>{money(batchTotals.vat)}</strong></span></div></div>
       </section>
@@ -297,7 +320,8 @@ export default function FinancePage() {
           <div style={statementHeader}><div><h2 style={panelTitle}>Management Income Statement</h2>
             <p style={panelText}>Operational performance based on posted invoices and processed cashbook entries. Amounts exclude VAT.</p></div>
             <div style={dateControls}><label style={dateLabel}>From<input type="date" value={statementStart} max={statementEnd} onChange={(event) => setStatementStart(event.target.value)} style={dateInput} /></label>
-              <label style={dateLabel}>To<input type="date" value={statementEnd} min={statementStart} onChange={(event) => setStatementEnd(event.target.value)} style={dateInput} /></label></div></div>
+              <label style={dateLabel}>To<input type="date" value={statementEnd} min={statementStart} onChange={(event) => setStatementEnd(event.target.value)} style={dateInput} /></label>
+              <button style={secondaryButton} onClick={exportIncomeStatement}>Export CSV</button></div></div>
           <div style={statementMetrics}><Metric label="Total Revenue" value={money(statement.revenue)} tone="blue" />
             <Metric label="Operating Expenses" value={money(statement.expenses)} tone="red" />
             <Metric label="Net Profit / (Loss)" value={money(statement.profit)} tone={statement.profit >= 0 ? "green" : "red"} />
@@ -339,6 +363,7 @@ function displayDate(value:string) { return new Date(`${value}T00:00:00`).toLoca
 function typeBadge(type:EntryType):CSSProperties { return {...badge,background:type === "income" ? "#EAF4FF" : type === "payout" ? "#EEF6FF" : "#EAF4FF",color:type === "income" ? "#0D5598" : type === "payout" ? "#0D5598" : "#0D5598"}; }
 function documentRow(label:string,value:string,large=false) { return `<div class="row${large ? " large" : ""}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`; }
 function escapeHtml(value:string) { return value.replace(/[&<>"']/g,(character)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"})[character] ?? character); }
+function csvCell(value:string) { return `"${value.replaceAll('"','""')}"`; }
 
 const page:CSSProperties={minHeight:"calc(100vh - 116px)",background:"linear-gradient(135deg,#EEF5FB 0%,#FFFFFF 45%,#EDF6FF 100%)",padding:"18px",fontFamily:'Inter, "Segoe UI", Arial, sans-serif',color:"#15263A"};
 const shell:CSSProperties={maxWidth:1580,margin:"0 auto"}; const header:CSSProperties={display:"flex",justifyContent:"space-between",gap:20,alignItems:"flex-end",marginBottom:14,flexWrap:"wrap"};
