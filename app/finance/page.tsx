@@ -50,8 +50,8 @@ export default function FinancePage() {
   const [propertyId, setPropertyId] = useState("");
   const [entries, setEntries] = useState<FinanceEntry[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [statementStart, setStatementStart] = useState(() => monthStart());
-  const [statementEnd, setStatementEnd] = useState(today);
+  const [periodStart, setPeriodStart] = useState(() => monthStart());
+  const [periodEnd, setPeriodEnd] = useState(today);
   const [batchRows, setBatchRows] = useState<BatchRow[]>(createRows);
   const [batchNumber] = useState(() => `CB-${today().replaceAll("-", "")}-${String(Date.now()).slice(-4)}`);
   const [loading, setLoading] = useState(true);
@@ -111,15 +111,29 @@ export default function FinancePage() {
     initialise();
   }, [loadEntries]);
 
+  const periodEntries = useMemo(() => entries.filter((entry) =>
+    entry.entry_date >= periodStart && entry.entry_date <= periodEnd), [entries, periodStart, periodEnd]);
   const filtered = useMemo(() => activeTab === "payouts"
-    ? entries.filter((entry) => entry.entry_type === "payout") : entries, [activeTab, entries]);
+    ? periodEntries.filter((entry) => entry.entry_type === "payout") : periodEntries, [activeTab, periodEntries]);
   const totals = useMemo(() => {
-    const income = entries.filter((e) => e.entry_type === "income").reduce((s, e) => s + Number(e.amount), 0);
-    const expenses = entries.filter((e) => e.entry_type !== "income").reduce((s, e) => s + Number(e.amount), 0);
-    const outputVat = entries.filter((e) => e.entry_type === "income").reduce((s, e) => s + Number(e.vat_amount), 0);
-    const inputVat = entries.filter((e) => e.entry_type !== "income").reduce((s, e) => s + Number(e.vat_amount), 0);
+    const income = periodEntries.filter((e) => e.entry_type === "income").reduce((s, e) => s + Number(e.amount), 0);
+    const expenses = periodEntries.filter((e) => e.entry_type !== "income").reduce((s, e) => s + Number(e.amount), 0);
+    const outputVat = periodEntries.filter((e) => e.entry_type === "income").reduce((s, e) => s + Number(e.vat_amount), 0);
+    const inputVat = periodEntries.filter((e) => e.entry_type !== "income").reduce((s, e) => s + Number(e.vat_amount), 0);
     return { income, expenses, balance: income - expenses, outputVat, inputVat, vatDue: outputVat - inputVat };
-  }, [entries]);
+  }, [periodEntries]);
+  const reconciliation = useMemo(() => {
+    const matched = periodEntries.filter((entry) => entry.bank_status === "matched");
+    const unmatched = periodEntries.filter((entry) => entry.bank_status === "unmatched");
+    const excluded = periodEntries.filter((entry) => entry.bank_status === "excluded");
+    const eligible = matched.length + unmatched.length;
+    return {
+      matched: matched.length,
+      unmatched: unmatched.length,
+      excluded: excluded.length,
+      progress: eligible > 0 ? (matched.length / eligible) * 100 : 0,
+    };
+  }, [periodEntries]);
   const batchTotals = useMemo(() => batchRows.reduce((total, row) => {
     const amount = Number(row.amount) || 0;
     return { debit: total.debit + (row.entry_type === "income" ? 0 : amount),
@@ -128,8 +142,7 @@ export default function FinancePage() {
   }, { debit: 0, credit: 0, vat: 0 }), [batchRows]);
   const hasActiveBatchRows = useMemo(() => batchRows.some((row) => row.description.trim() || row.reference.trim() || Number(row.amount) > 0), [batchRows]);
   const statement = useMemo(() => {
-    const periodEntries = entries.filter((entry) => entry.entry_date >= statementStart && entry.entry_date <= statementEnd);
-    const periodInvoices = invoices.filter((invoice) => invoice.invoice_date >= statementStart && invoice.invoice_date <= statementEnd);
+    const periodInvoices = invoices.filter((invoice) => invoice.invoice_date >= periodStart && invoice.invoice_date <= periodEnd);
     const accommodationRevenue = periodInvoices.reduce((sum, invoice) => sum + Math.max(0, Number(invoice.total_amount) - Number(invoice.vat_amount)), 0);
     const otherIncome = periodEntries.filter((entry) => entry.entry_type === "income")
       .reduce((sum, entry) => sum + Math.max(0, Number(entry.amount) - Number(entry.vat_amount)), 0);
@@ -145,7 +158,7 @@ export default function FinancePage() {
       margin: revenue > 0 ? (profit / revenue) * 100 : 0,
       expenseGroups: Object.entries(expenseGroups).sort((a, b) => b[1] - a[1]),
       invoiceCount: periodInvoices.length, entryCount: periodEntries.length };
-  }, [entries, invoices, statementStart, statementEnd]);
+  }, [periodEntries, invoices, periodStart, periodEnd]);
 
   useEffect(() => {
     function protectUnsavedBatch(event: BeforeUnloadEvent) {
@@ -247,7 +260,7 @@ export default function FinancePage() {
       : activeTab === "reconciliation" ? "BANK RECONCILIATION" : activeTab === "income-statement" ? "MANAGEMENT INCOME STATEMENT" : "CASHBOOK REPORT";
     if (activeTab === "income-statement") {
       const expenseRows = statement.expenseGroups.map(([category, amount]) => documentRow(category, money(amount))).join("");
-      const body = `<div class="document-header"><div><div class="property-name">${escapeHtml(propertyName)}</div><div>NETPOS HOSPITALITY</div></div><div class="document-title"><h1>${reportTitle}</h1><div>${displayDate(statementStart)} to ${displayDate(statementEnd)}</div></div></div>
+      const body = `<div class="document-header"><div><div class="property-name">${escapeHtml(propertyName)}</div><div>NETPOS HOSPITALITY</div></div><div class="document-title"><h1>${reportTitle}</h1><div>${displayDate(periodStart)} to ${displayDate(periodEnd)}</div></div></div>
         <div class="section"><div class="section-title">Revenue</div>${documentRow("Accommodation revenue", money(statement.accommodationRevenue))}${documentRow("Other income", money(statement.otherIncome))}${documentRow("Total revenue", money(statement.revenue), true)}</div>
         <div class="section"><div class="section-title">Operating expenses</div>${expenseRows || documentRow("No expenses recorded", money(0))}${documentRow("Total operating expenses", money(statement.expenses), true)}</div>
         <div class="section">${documentRow("Net profit / (loss)", money(statement.profit), true)}${documentRow("Operating margin", `${statement.margin.toFixed(1)}%`)}</div>
@@ -255,9 +268,9 @@ export default function FinancePage() {
       openPrintPreview({ title: `${propertyName} - ${reportTitle}`, body, orientation: "portrait" });
       return;
     }
-    const reportEntries = activeTab === "payouts" ? filtered : entries;
+    const reportEntries = activeTab === "payouts" ? filtered : periodEntries;
     const rows = reportEntries.map((entry) => `<tr><td>${displayDate(entry.entry_date)}</td><td>${entry.entry_type.toUpperCase()}</td><td>${escapeHtml(entry.description)}<br/><small>${escapeHtml(entry.category)}</small></td><td>${escapeHtml(entry.reference ?? "-")}</td><td>${entry.payment_method.toUpperCase()}</td><td class="right">${money(entry.vat_amount)}</td><td class="right">${entry.entry_type === "income" ? "+" : "-"}${money(entry.amount)}</td></tr>`).join("");
-    const body = `<div class="document-header"><div><div class="property-name">${escapeHtml(propertyName)}</div><div>NETPOS HOSPITALITY</div></div><div class="document-title"><h1>${reportTitle}</h1><div>Printed ${new Date().toLocaleString("en-NA")}</div></div></div>
+    const body = `<div class="document-header"><div><div class="property-name">${escapeHtml(propertyName)}</div><div>NETPOS HOSPITALITY</div></div><div class="document-title"><h1>${reportTitle}</h1><div>${displayDate(periodStart)} to ${displayDate(periodEnd)}</div></div></div>
       <div class="section"><div class="section-title">Summary</div>${documentRow("Income", money(totals.income))}${documentRow("Expenses & Payouts", money(totals.expenses))}${documentRow("Net Cashbook", money(totals.balance), true)}${documentRow("VAT Payable / (Credit)", money(totals.vatDue), true)}</div>
       <div class="section"><table><thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Reference</th><th>Method</th><th class="right">VAT</th><th class="right">Amount</th></tr></thead><tbody>${rows || `<tr><td colspan="7">No processed entries.</td></tr>`}</tbody></table></div>
       <div class="footer">Generated by Netpos Hospitality · ${escapeHtml(propertyName)}</div>`;
@@ -267,7 +280,7 @@ export default function FinancePage() {
   function exportIncomeStatement() {
     const propertyName = properties.find((property) => property.id === propertyId)?.name ?? "Property";
     const rows = [
-      ["Management Income Statement", propertyName], ["Period", `${statementStart} to ${statementEnd}`], [],
+      ["Management Income Statement", propertyName], ["Period", `${periodStart} to ${periodEnd}`], [],
       ["Revenue", "Amount (NAD)"], ["Accommodation revenue", statement.accommodationRevenue],
       ["Other income", statement.otherIncome], ["Total revenue", statement.revenue], [],
       ["Operating expenses", "Amount (NAD)"], ...statement.expenseGroups,
@@ -277,7 +290,7 @@ export default function FinancePage() {
     const csv = rows.map((row) => row.map((cell) => csvCell(String(cell ?? ""))).join(",")).join("\r\n");
     const link = document.createElement("a");
     link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    link.download = `${propertyName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-income-statement-${statementStart}-${statementEnd}.csv`;
+    link.download = `${propertyName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-income-statement-${periodStart}-${periodEnd}.csv`;
     link.click(); URL.revokeObjectURL(link.href);
   }
 
@@ -288,6 +301,8 @@ export default function FinancePage() {
       <p style={subtitle}>{activeSection.hint}</p></div>
       <div style={headerControls}><select value={propertyId} onChange={(e) => changeProperty(e.target.value)} style={propertySelect} aria-label="Property">
         {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+        <label style={dateLabel}>From<input type="date" value={periodStart} max={periodEnd} onChange={(event) => setPeriodStart(event.target.value)} style={dateInput} /></label>
+        <label style={dateLabel}>To<input type="date" value={periodEnd} min={periodStart} onChange={(event) => setPeriodEnd(event.target.value)} style={dateInput} /></label>
         <button style={previewButton} onClick={previewFinanceReport}>PDF Preview</button></div>
     </header>
 
@@ -339,13 +354,20 @@ export default function FinancePage() {
         <div style={batchActions}><button style={secondaryButton} onClick={saveBatchDraft}>Save Draft</button>
           <button style={processButton} onClick={processBatch} disabled={processing}>{processing ? "Processing..." : "Process Batch"}</button></div>
       </div>
-      <HistoryPanel title="Posted Cashbook Entries" description="Processed transactions for this property." entries={entries} loading={loading} />
+      <HistoryPanel title="Posted Cashbook Entries" description="Processed transactions for the selected period." entries={periodEntries} loading={loading} />
     </>}
 
         {activeTab === "vat" && <section style={panel}><div style={panelHeading}><div><h2 style={panelTitle}>VAT Summary</h2><p style={panelText}>Based on processed cashbook entries.</p></div></div>
       <div style={vatGrid}><Metric label="Output VAT collected" value={money(totals.outputVat)} tone="blue" /><Metric label="Input VAT paid" value={money(totals.inputVat)} tone="green" />
         <Metric label="VAT payable / (credit)" value={money(totals.vatDue)} tone={totals.vatDue >= 0 ? "red" : "green"} /></div>
       <p style={note}>Management summary only. Confirm tax periods and supporting invoices before filing a VAT return.</p></section>}
+
+        {activeTab === "reconciliation" && <div style={reconciliationGrid}>
+          <Metric label="Matched" value={`${reconciliation.matched} entries`} tone="green" />
+          <Metric label="Unmatched" value={`${reconciliation.unmatched} entries`} tone={reconciliation.unmatched > 0 ? "red" : "blue"} />
+          <Metric label="Excluded" value={`${reconciliation.excluded} entries`} tone="silver" />
+          <Metric label="Reconciled" value={`${reconciliation.progress.toFixed(0)}%`} tone="blue" />
+        </div>}
 
         {(activeTab === "reconciliation" || activeTab === "payouts") && <HistoryPanel title={activeTab === "reconciliation" ? "Bank Reconciliation" : "Payouts"}
       description={activeTab === "reconciliation" ? "Review entries and link them to the bank statement." : "Processed cash payouts for this property."}
@@ -354,9 +376,7 @@ export default function FinancePage() {
         {activeTab === "income-statement" && <section style={panel}>
           <div style={statementHeader}><div><h2 style={panelTitle}>Management Income Statement</h2>
             <p style={panelText}>Operational performance based on posted invoices and processed cashbook entries. Amounts exclude VAT.</p></div>
-            <div style={dateControls}><label style={dateLabel}>From<input type="date" value={statementStart} max={statementEnd} onChange={(event) => setStatementStart(event.target.value)} style={dateInput} /></label>
-              <label style={dateLabel}>To<input type="date" value={statementEnd} min={statementStart} onChange={(event) => setStatementEnd(event.target.value)} style={dateInput} /></label>
-              <button style={secondaryButton} onClick={exportIncomeStatement}>Export CSV</button></div></div>
+            <div style={dateControls}><button style={secondaryButton} onClick={exportIncomeStatement}>Export CSV</button></div></div>
           <div style={statementMetrics}><Metric label="Total Revenue" value={money(statement.revenue)} tone="blue" />
             <Metric label="Operating Expenses" value={money(statement.expenses)} tone="red" />
             <Metric label="Net Profit / (Loss)" value={money(statement.profit)} tone={statement.profit >= 0 ? "green" : "red"} />
@@ -410,6 +430,7 @@ const financeWorkspace:CSSProperties={display:"grid",gridTemplateColumns:"220px 
 const financeSidebar:CSSProperties={position:"sticky",top:78,display:"flex",flexDirection:"column",gap:6,padding:8,border:"1px solid #D4E2EC",borderRadius:12,background:"#FFFFFF",boxShadow:"0 5px 18px rgba(13,79,145,.07)"};
 const financeSidebarHeading:CSSProperties={padding:"8px 10px 5px",color:"#678097",fontSize:9,fontWeight:900,textTransform:"uppercase",letterSpacing:.8};
 const financePageContent:CSSProperties={minWidth:0};
+const reconciliationGrid:CSSProperties={display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10,marginBottom:10};
 const tabButton:CSSProperties={width:"100%",minHeight:58,border:"1px solid #E0EAF1",borderRadius:8,padding:"9px 11px",background:"#F8FBFE",color:"#38566F",cursor:"pointer",display:"flex",flexDirection:"column",justifyContent:"center",gap:3,textAlign:"left",fontFamily:"inherit"};
 const activeTabButton:CSSProperties={background:"linear-gradient(135deg,#123F69 0%,#0B5FA5 100%)",borderColor:"#0B5FA5",color:"white",boxShadow:"0 5px 15px rgba(13,79,145,.20)"};
 const panel:CSSProperties={background:"rgba(255,255,255,.96)",border:"1px solid #DCE5ED",borderRadius:12,boxShadow:"0 8px 24px rgba(24,54,78,.07)",overflow:"hidden"}; const panelHeading:CSSProperties={padding:"13px 15px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #E6ECF2"}; const panelTitle:CSSProperties={margin:0,fontSize:17,color:"#173E5C"}; const panelText:CSSProperties={margin:"3px 0 0",fontSize:12,color:"#667085"}; const countBadge:CSSProperties={fontSize:11,fontWeight:800,background:"#EDF4FA",color:"#276C91",padding:"5px 8px",borderRadius:99};
