@@ -106,7 +106,7 @@ export default function FinancePage() {
       const rows = scopeProperties((data as Property[]) ?? []);
       setProperties(rows);
       const initial = rows.some((item) => item.id === savedProperty) ? savedProperty : rows[0]?.id ?? "";
-      setPropertyId(initial); restoreDraft(initial); await loadEntries(initial);
+      setPropertyId(initial); await restoreDraft(initial); await loadEntries(initial);
     }
     initialise();
   }, [loadEntries]);
@@ -157,15 +157,19 @@ export default function FinancePage() {
     return () => window.removeEventListener("beforeunload", protectUnsavedBatch);
   }, [draftSaved, hasActiveBatchRows]);
 
-  function restoreDraft(selectedProperty: string) {
+  async function restoreDraft(selectedProperty: string) {
     if (!selectedProperty) { setBatchRows(createRows()); setDraftSaved(false); return; }
-    const saved = sessionStorage.getItem(`netpos_finance_batch_${selectedProperty}`);
+    const { data, error: draftError } = await supabase.from("finance_batch_drafts").select("rows").eq("property_id", selectedProperty).maybeSingle();
+    if (!draftError && Array.isArray(data?.rows) && data.rows.length > 0) {
+      setBatchRows(data.rows as BatchRow[]); setDraftSaved(true); return;
+    }
+    const saved = localStorage.getItem(`netpos_finance_batch_${selectedProperty}`);
     try { setBatchRows(saved ? JSON.parse(saved) as BatchRow[] : createRows()); setDraftSaved(Boolean(saved)); }
     catch { setBatchRows(createRows()); setDraftSaved(false); }
   }
   async function changeProperty(next: string) {
     setPropertyId(next); sessionStorage.setItem("netpos_property_id", next);
-    restoreDraft(next); await loadEntries(next);
+    await restoreDraft(next); await loadEntries(next);
   }
   function updateRow(id: string, field: keyof BatchRow, value: string) {
     setBatchRows((rows) => rows.map((row) => {
@@ -183,15 +187,25 @@ export default function FinancePage() {
     setBatchRows((rows) => rows.length === 1 ? createRows() : rows.filter((row) => row.id !== id));
     setDraftSaved(false);
   }
-  function saveBatchDraft() {
+  async function saveBatchDraft() {
     if (!propertyId) { setError("Select a property before saving the batch."); return; }
-    sessionStorage.setItem(`netpos_finance_batch_${propertyId}`, JSON.stringify(batchRows));
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) { setError("Your session has expired. Sign in again before saving this batch."); return; }
+    const { error: saveError } = await supabase.from("finance_batch_drafts").upsert({
+      property_id: propertyId, rows: batchRows, created_by: auth.user.id, updated_at: new Date().toISOString(),
+    }, { onConflict: "property_id" });
+    if (saveError) {
+      localStorage.setItem(`netpos_finance_batch_${propertyId}`, JSON.stringify(batchRows));
+      setError(`Cloud draft unavailable: ${saveError.message}. A recovery copy was saved on this workstation.`); return;
+    }
+    localStorage.removeItem(`netpos_finance_batch_${propertyId}`);
     setDraftSaved(true);
-    setError(""); setMessage("Batch saved as a draft on this workstation. It has not been posted yet.");
+    setError(""); setMessage("Batch saved securely. Authorised finance users can continue it from another workstation.");
   }
-  function clearBatch() {
+  async function clearBatch() {
     if (!window.confirm("Clear all unprocessed rows in this batch?")) return;
-    sessionStorage.removeItem(`netpos_finance_batch_${propertyId}`);
+    await supabase.from("finance_batch_drafts").delete().eq("property_id", propertyId);
+    localStorage.removeItem(`netpos_finance_batch_${propertyId}`);
     setBatchRows(createRows()); setDraftSaved(false); setError(""); setMessage("Batch cleared.");
   }
   async function processBatch() {
@@ -211,7 +225,8 @@ export default function FinancePage() {
     })));
     if (insertError) setError(insertError.message);
     else {
-      sessionStorage.removeItem(`netpos_finance_batch_${propertyId}`); setBatchRows(createRows());
+      await supabase.from("finance_batch_drafts").delete().eq("property_id", propertyId);
+      localStorage.removeItem(`netpos_finance_batch_${propertyId}`); setBatchRows(createRows());
       setDraftSaved(false);
       setMessage(`${activeRows.length} transaction${activeRows.length === 1 ? "" : "s"} processed successfully.`);
       await loadEntries(propertyId);
@@ -320,7 +335,7 @@ export default function FinancePage() {
       </section>
       <div style={stickySaveBar} role="region" aria-label="Cashbook saving controls">
         <div><strong style={saveBarTitle}>{draftSaved ? "Draft saved" : "Cashbook batch not saved"}</strong>
-          <span style={saveBarHint}>{draftSaved ? "Safe on this workstation until it is processed." : "Save your work before leaving this page."}</span></div>
+          <span style={saveBarHint}>{draftSaved ? "Saved securely until it is processed." : "Save your work before leaving this page."}</span></div>
         <div style={batchActions}><button style={secondaryButton} onClick={saveBatchDraft}>Save Draft</button>
           <button style={processButton} onClick={processBatch} disabled={processing}>{processing ? "Processing..." : "Process Batch"}</button></div>
       </div>
